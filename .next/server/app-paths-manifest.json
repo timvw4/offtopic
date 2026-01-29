@@ -1,0 +1,12 @@
+{
+  "/api/game/reset/route": "app/api/game/reset/route.js",
+  "/api/game/next/route": "app/api/game/next/route.js",
+  "/api/drawing/route": "app/api/drawing/route.js",
+  "/api/player/leave/route": "app/api/player/leave/route.js",
+  "/page": "app/page.js",
+  "/(game)/room/[roomCode]/reveal/page": "app/(game)/room/[roomCode]/reveal/page.js",
+  "/(game)/room/[roomCode]/vote/page": "app/(game)/room/[roomCode]/vote/page.js",
+  "/(game)/room/[roomCode]/draw/page": "app/(game)/room/[roomCode]/draw/page.js",
+  "/(game)/room/[roomCode]/results/page": "app/(game)/room/[roomCode]/results/page.js",
+  "/(game)/room/[roomCode]/page": "app/(game)/room/[roomCode]/page.js"
+}

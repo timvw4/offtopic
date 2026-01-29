@@ -302,31 +302,33 @@ const selectedDict = settings.has_dictator ?? false;
         </div>
       )}
 
-      {!isHost && <p>En attente de l&apos;hôte pour lancer la partie.</p>}
-      <button
-        className="btn"
-        disabled={!isHost || startDisabled}
-        style={{ opacity: !isHost || startDisabled ? 0.5 : 1 }}
-        onClick={async () => {
-          if (!isHost) return;
-          const resp = await fetch("/api/game/start", {
-            method: "POST",
-            body: JSON.stringify({
-              roomCode: params.roomCode,
-              settings: {
-                hors_theme_count: selectedHt,
-                has_cameleon: selectedCam,
-                has_dictator: selectedDict,
-                drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
-              },
-            }),
-          });
-          if (!resp.ok) return;
-          router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
-        }}
-      >
-        {isHost ? "Démarrer" : "En attente de l&apos;hôte"}
-      </button>
+      {isHost ? (
+        <button
+          className="btn"
+          disabled={startDisabled}
+          style={{ opacity: startDisabled ? 0.5 : 1 }}
+          onClick={async () => {
+            const resp = await fetch("/api/game/start", {
+              method: "POST",
+              body: JSON.stringify({
+                roomCode: params.roomCode,
+                settings: {
+                  hors_theme_count: selectedHt,
+                  has_cameleon: selectedCam,
+                  has_dictator: selectedDict,
+                  drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
+                },
+              }),
+            });
+            if (!resp.ok) return;
+            router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
+          }}
+        >
+          Démarrer
+        </button>
+      ) : (
+        <p>En attente de l&apos;hôte pour lancer la partie.</p>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 
@@ -103,7 +104,7 @@ export default function RevealPage() {
       if (pollId) clearInterval(pollId);
       if (pollDrawings) clearInterval(pollDrawings);
     };
-  }, [params.roomCode]);
+  }, [nickname, params.roomCode]);
 
   const isHost = useMemo(() => host === nickname, [host, nickname]);
   const allDrawingsDone = useMemo(
@@ -136,7 +137,14 @@ export default function RevealPage() {
           .map((d) => (
           <div key={d.id} className="card">
             <strong>{d.nickname}</strong>
-            <img src={d.data_url} alt={`Dessin de ${d.nickname}`} style={{ width: "100%", borderRadius: 8 }} />
+            <Image
+              src={d.data_url}
+              alt={`Dessin de ${d.nickname}`}
+              width={400}
+              height={300}
+              style={{ width: "100%", height: "auto", borderRadius: 8 }}
+              unoptimized
+            />
           </div>
         ))}
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { supabaseClient } from "@/lib/supabaseClient";
@@ -239,11 +240,7 @@ const selectedDict = settings.has_dictator ?? false;
                   checked={selectedCam}
                   onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict)}
                 />
-                <img
-                  src="/roles/chameleon.png"
-                  alt="Caméléon"
-                  style={{ width: 40, height: 40, objectFit: "contain" }}
-                />
+                <Image src="/roles/chameleon.png" alt="Caméléon" width={40} height={40} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -275,11 +272,7 @@ const selectedDict = settings.has_dictator ?? false;
                   checked={selectedDict}
                   onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked)}
                 />
-                <img
-                  src="/roles/dictator.png"
-                  alt="Dictateur"
-                  style={{ width: 40, height: 40, objectFit: "contain" }}
-                />
+                <Image src="/roles/dictator.png" alt="Dictateur" width={40} height={40} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span>Dictateur</span>
@@ -289,7 +282,7 @@ const selectedDict = settings.has_dictator ?? false;
                   </small>
                 </div>
               </label>
-              <p style={{ margin: 0, fontSize: 13, color: "#888" }}>D'autres rôles seront ajoutés plus tard.</p>
+              <p style={{ margin: 0, fontSize: 13, color: "#888" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
             </div>
           )}
           <label style={{ display: "grid", gap: 6 }}>
@@ -309,7 +302,7 @@ const selectedDict = settings.has_dictator ?? false;
         </div>
       )}
 
-      {!isHost && <p>En attente de l'hôte pour lancer la partie.</p>}
+      {!isHost && <p>En attente de l&apos;hôte pour lancer la partie.</p>}
       <button
         className="btn"
         disabled={!isHost || startDisabled}
@@ -332,7 +325,7 @@ const selectedDict = settings.has_dictator ?? false;
           router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
         }}
       >
-        {isHost ? "Démarrer" : "En attente de l'hôte"}
+        {isHost ? "Démarrer" : "En attente de l&apos;hôte"}
       </button>
     </div>
   );

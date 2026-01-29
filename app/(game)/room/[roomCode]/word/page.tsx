@@ -155,7 +155,7 @@ export default function WordRevealPage() {
       .update({ draw_starts_at: start, phase: "DRAW" })
       .eq("id", roundId)
       .then();
-  }, [allReady, drawStartsAt, me?.isHost, params.roomCode, roundId]);
+  }, [allReady, drawStartsAt, isEliminated, me?.isHost, params.roomCode, roundId]);
 
   // Dès qu'un départ est fixé, tout le monde va sur la page dessin (le compte à rebours s'y affichera)
   useEffect(() => {

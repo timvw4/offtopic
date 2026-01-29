@@ -73,7 +73,7 @@ export default function DrawPage() {
       channel?.unsubscribe();
       if (pollRound) clearInterval(pollRound);
     };
-  }, [params.roomCode]);
+  }, [nickname, params.roomCode]);
 
   // Gère le compte à rebours commun
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function DrawPage() {
     tick();
     const id = setInterval(tick, 200);
     return () => clearInterval(id);
-  }, [drawStartsAt, timer]);
+  }, [drawStartsAt, isEliminated, nickname, params.roomCode, router, timer]);
 
   return (
     <div style={{ display: "grid", gap: 12 }}>

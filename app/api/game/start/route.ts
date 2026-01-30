@@ -187,7 +187,6 @@ export async function POST(request: Request) {
       has_cameleon: effective.has_cameleon,
       has_dictator: effective.has_dictator,
       drawing_timer_seconds: timerSeconds,
-      drawing_timer_seconds: timerSeconds,
       word_theme: theme,
     })
     .eq("code", roomCode);

@@ -67,14 +67,14 @@ export default function HomePage() {
       style={{
         display: "grid",
         gap: 12,
-        padding: 8,
+        padding: "4px 8px 8px",
         maxWidth: 960,
         margin: "0 auto",
         minHeight: "calc(100vh - 120px)",
         alignContent: "start",
       }}
     >
-      <div style={{ display: "grid", gap: 10, textAlign: "center" }}>
+      <div style={{ display: "grid", gap: 10, textAlign: "center", marginTop: -12 }}>
         <div style={{ justifySelf: "center", width: "100%", maxWidth: 720 }}>
           <Image src={titleLogo} alt="OFF-TOPIC" priority style={{ width: "100%", height: "auto" }} sizes="640px" />
         </div>

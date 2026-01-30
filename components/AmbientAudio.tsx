@@ -13,7 +13,7 @@ export function AmbientAudio() {
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.7;
+    audio.volume = 0.6; // ajuste ici si trop faible ou trop fort (0.0 à 1.0)
     audioRef.current = audio;
 
     const tryPlay = async () => {

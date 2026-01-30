@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import { ReactNode, useEffect } from "react";
+import { AmbientAudio } from "@/components/AmbientAudio";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <main className="app-shell">{children}</main>
+        <AmbientAudio />
       </body>
     </html>
   );

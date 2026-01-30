@@ -229,6 +229,15 @@ hr {
   padding: 12px;
 }
 
+.audio-floating {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: grid;
+  gap: 6px;
+  z-index: 20;
+}
+
 @keyframes popFade {
   0% {
     transform: translateY(8px) scale(0.98);

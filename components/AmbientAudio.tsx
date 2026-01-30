@@ -24,7 +24,7 @@ export function AmbientAudio() {
       } catch (err) {
         // Autoplay bloqué : on affiche le bouton pour déclencher manuellement
         setPlaying(false);
-        setError("Autoplay bloqué, clique pour lancer.");
+        setError("Autoplay bloqué.");
       }
     };
 
@@ -58,18 +58,26 @@ export function AmbientAudio() {
         setPlaying(false);
       }
     } catch (err) {
-      setError("Lecture bloquée, réessaie.");
+      setError("Lecture bloquée.");
     }
   }
 
   return (
-    <div className="audio-floating">
+    <div className="audio-floating" style={{ right: 12, left: "auto", justifyItems: "end" }}>
       <button
         className="btn btn-compact btn-ghost"
-        style={{ color: "#facc15", padding: "6px 10px", minHeight: "36px", height: "36px", fontSize: 14 }}
+        style={{
+          color: "#facc15",
+          padding: "6px 8px",
+          minHeight: "32px",
+          height: "32px",
+          fontSize: 13,
+          width: "fit-content",
+          minWidth: "unset",
+        }}
         onClick={toggle}
       >
-        {playing ? "⏸️ Pause ambiance" : "▶️ Musique ON"}
+        {playing ? "⏸️ OFF" : "▶️ ON"}
       </button>
       {error && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#e5e7eb" }}>{error}</p>}
     </div>

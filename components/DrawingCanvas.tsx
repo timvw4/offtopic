@@ -13,7 +13,19 @@ export interface DrawingCanvasHandle {
   exportImage: () => string | null;
 }
 
-const colors = ["#000000", "#ef4444", "#22c55e", "#3b82f6", "#a855f7", "#f59e0b"];
+const colors = [
+  "#000000",
+  "#ef4444",
+  "#22c55e",
+  "#3b82f6",
+  "#a855f7",
+  "#f59e0b",
+  "#ffffff",
+  "#f97316",
+  "#0ea5e9",
+  "#10b981",
+  "#ec4899",
+];
 
 export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function DrawingCanvas(
   { onExport, disabled }: Props,
@@ -121,31 +133,45 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   return (
     <div className="card" style={{ display: "grid", gap: 12, padding: 18 }} ref={containerRef}>
       <div className="panel" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {colors.map((c) => (
-          <button
-            key={c}
-            className="btn btn-compact"
-            style={{
-              background: c,
-              color: "#fff",
-              width: 48,
-              minWidth: 48,
-              padding: 0,
-              border: "2px solid rgba(255,255,255,0.3)",
-            }}
-            onClick={() => setBrushColor(c)}
-            aria-label={`Choisir la couleur ${c}`}
-          >
-            🎨
-          </button>
-        ))}
-        <label style={{ color: "var(--text)", display: "grid", gap: 4 }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Taille</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start" }}>
+          {colors.map((c) => (
+            <button
+              key={c}
+              type="button"
+              style={{
+                background: c,
+                color: "transparent",
+                width: 34,
+                minWidth: 34,
+                height: 34,
+                padding: 0,
+                borderRadius: "50%",
+                aspectRatio: "1 / 1",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: "0 0 34px",
+                lineHeight: "0",
+                boxSizing: "border-box",
+                fontSize: 0,
+                border: "2px solid rgba(255,255,255,0.35)",
+                boxShadow: brushColor === c ? "0 0 0 3px rgba(250,204,21,0.5)" : "none",
+              }}
+              onClick={() => setBrushColor(c)}
+              aria-label={`Choisir la couleur ${c}`}
+            >
+              {/* pastille */}
+            </button>
+          ))}
+        </div>
+        <label style={{ color: "var(--text)", display: "grid", gap: 4, textAlign: "center" }}>
+          <span style={{ fontWeight: 600, fontSize: 14, justifySelf: "center" }}>Taille</span>
           <input
             type="range"
             min={2}
             max={14}
             value={brushSize}
+            className="size-slider"
             onChange={(e) => setBrushSize(Number(e.target.value))}
           />
         </label>
@@ -176,6 +202,43 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
         onTouchMove={move}
         onTouchEnd={end}
       />
+      <style jsx>{`
+        .size-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 160px;
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(250, 204, 21, 0.25), rgba(168, 85, 247, 0.35));
+          outline: none;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+          cursor: pointer;
+        }
+        .size-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #a855f7;
+          border: 2px solid #0b0f1a;
+          box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35);
+        }
+        .size-slider::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #a855f7;
+          border: 2px solid #0b0f1a;
+          box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35);
+        }
+        .size-slider::-moz-range-track {
+          height: 8px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(250, 204, 21, 0.25), rgba(168, 85, 247, 0.35));
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+      `}</style>
     </div>
   );
 });

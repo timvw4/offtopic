@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import titleLogo from "../public/title.png";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseClient } from "@/lib/supabaseClient";
@@ -61,15 +63,34 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 28, padding: 8, maxWidth: 960, margin: "0 auto" }}>
+    <div
+      style={{
+        display: "grid",
+        gap: 12,
+        padding: 8,
+        maxWidth: 960,
+        margin: "0 auto",
+        minHeight: "calc(100vh - 120px)",
+        alignContent: "start",
+      }}
+    >
       <div style={{ display: "grid", gap: 10, textAlign: "center" }}>
-        <h1 style={{ fontSize: 36 }}>OFF-TOPIC</h1>
-        <p style={{ marginTop: 6, fontSize: 16, color: "var(--muted)" }}>
-          Dessine vite, devine mieux, accuse au bon moment. Ambiance tableau noir + croquis à main levée.
-        </p>
+        <div style={{ justifySelf: "center", width: "100%", maxWidth: 720 }}>
+          <Image src={titleLogo} alt="OFF-TOPIC" priority style={{ width: "100%", height: "auto" }} sizes="640px" />
+        </div>
       </div>
-
-      <div className="panel" style={{ display: "grid", gap: 14, width: "100%", maxWidth: 520, justifySelf: "center" }}>
+      <div
+        className="panel"
+        style={{
+          display: "grid",
+          gap: 14,
+          width: "100%",
+          maxWidth: 520,
+          justifySelf: "center",
+          marginTop: -24,
+          alignSelf: "center",
+        }}
+      >
         <label style={{ textAlign: "left", display: "grid", gap: 6 }}>
           <span style={{ fontWeight: 600 }}>Ton pseudo</span>
           <input

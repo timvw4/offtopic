@@ -13,7 +13,7 @@ export function AmbientAudio() {
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.01;
+    audio.volume = 0.7;
     audioRef.current = audio;
 
     const tryPlay = async () => {
@@ -64,7 +64,11 @@ export function AmbientAudio() {
 
   return (
     <div className="audio-floating">
-      <button className="btn btn-compact btn-ghost" style={{ color: "#facc15" }} onClick={toggle}>
+      <button
+        className="btn btn-compact btn-ghost"
+        style={{ color: "#facc15", padding: "6px 10px", minHeight: "36px", height: "36px", fontSize: 14 }}
+        onClick={toggle}
+      >
         {playing ? "⏸️ Pause ambiance" : "▶️ Musique ON"}
       </button>
       {error && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#e5e7eb" }}>{error}</p>}

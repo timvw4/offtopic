@@ -50,8 +50,8 @@ export function VotePanel({
               name="vote"
               value={p.id}
               checked={selected === p.id}
-              disabled={disableVote}
-              onChange={() => setSelected(p.id)}
+                disabled={disableVote}
+                onChange={() => setSelected(p.id)}
               style={{ accentColor: "#ffffff", width: 18, height: 18 }}
             />
             <span style={{ fontWeight: 600 }}>{p.nickname}</span>
@@ -59,8 +59,8 @@ export function VotePanel({
         ))}
       {!hideVoteButton && (
         <button className="btn btn-compact" disabled={!selected || disableVote} onClick={() => selected && onVote(selected)}>
-          Voter
-        </button>
+        Voter
+      </button>
       )}
       {showAccusation && (
         <>

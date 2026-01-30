@@ -28,7 +28,11 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
         <div>
           <strong>Salle</strong> {params.roomCode}
         </div>
-        <button className="btn secondary" onClick={handleLeave}>
+        <button
+          className="btn btn-compact btn-ghost"
+          style={{ border: "1.5px solid rgba(231, 231, 231, 0.63)", color: "#e5e7eb" }}
+          onClick={handleLeave}
+        >
           Quitter
         </button>
       </header>

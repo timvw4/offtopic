@@ -1,2 +1,72 @@
 
 
+CONTEXTE PROJET
+Tu travailles sur le jeu web OFF-TOPIC.
+Le projet est déjà fonctionnel (logique de jeu, Supabase, rooms, votes, dessins).
+⚠️ INTERDICTION ABSOLUE de modifier la logique métier, le backend, les règles du jeu ou les fonctionnalités existantes.
+Ton rôle est UNIQUEMENT de revoir le DESIGN (UI / UX / styles).
+
+STACK
+- Frontend : Next.js (mobile first)
+- Backend : Supabase
+- Jeu sans comptes, pseudo obligatoire à l’entrée
+- Jeu de dessin social / déduction
+
+OBJECTIF DESIGN
+Créer une direction artistique forte, cohérente et mémorable, inspirée :
+- du dessin à la main
+- des croquis rapides faits en 30–90 secondes
+- d’un tableau noir / feuille blanche
+- ambiance fun + suspicion + jeu social
+
+RÉFÉRENCE VISUELLE
+Les dessins du jeu ressemblent à des croquis simples, imparfaits, comme faits par un humain (traits irréguliers, pas propres).
+Le background fourni contient des doodles dessinés à la main (maisons, points d’interrogation, silhouettes, cerveau, cercles).
+
+STYLE GLOBAL À APPLIQUER
+- Dark mode dominant (fond ardoise / bleu nuit / tableau noir)
+- Contraste fort avec le blanc (zones de dessin, cartes)
+- Typographie lisible, moderne mais pas “corporate”
+- Bordures légèrement arrondies
+- Ombres douces, jamais agressives
+- Transitions subtiles (fade, slide léger)
+- Aucun effet flashy ou néon
+
+BACKGROUND & DOODLES
+- Utiliser les images de doodles UNIQUEMENT comme décor
+- Toujours en position absolute
+- Opacité faible (5 à 10 % max)
+- Jamais sous du texte important
+- Jamais sous un bouton principal
+- Placement irrégulier, jamais en motif répétitif
+- Le contenu doit toujours rester prioritaire et lisible
+
+COMPOSANTS UI
+- Boutons : sobres, contrastés, lisibles, feedback clair au clic
+- Cartes / panels : fond sombre légèrement plus clair que le background
+- Canvas de dessin : blanc pur, centré, très lisible
+- Timer : visible, clair, mais pas stressant
+- Votes : interface simple, compréhensible en 1 seconde
+
+UX / ERGONOMIE
+- Mobile first obligatoire
+- Gros boutons tactiles
+- Espacements généreux
+- Aucun texte trop petit
+- Navigation évidente pour un joueur qui découvre le jeu en soirée
+
+RÈGLES STRICTES
+- NE PAS changer les noms de variables, API, tables Supabase
+- NE PAS ajouter de nouvelles features
+- NE PAS supprimer de composants
+- NE PAS modifier la logique du canvas
+- NE PAS toucher au flow du jeu
+- Uniquement CSS / styles / layout / composants visuels
+
+LIVRABLE ATTENDU
+- Amélioration visuelle globale cohérente
+- Identité claire “OFF-TOPIC”
+- Sensation de jeu fun, social, légèrement chaotique
+- Interface qui donne envie de jouer en groupe
+
+Si un doute existe entre design et fonctionnalité → NE PAS TOUCHER.

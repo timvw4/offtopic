@@ -189,32 +189,40 @@ export default function WordRevealPage() {
           : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème.";
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <h2>Mot secret</h2>
       <WordCard word={displayedWord} roleLabel={`Tu es ${roleLabel}`} />
       <div className="card" style={{ display: "grid", gap: 6 }}>
         <strong>Ton rôle : {roleLabel}</strong>
-        <p style={{ margin: 0, color: "#aaa" }}>{roleDescription}</p>
+        <p style={{ margin: 0 }}>{roleDescription}</p>
       </div>
 
-      <div className="card" style={{ display: "grid", gap: 8 }}>
-        <strong>Prêts</strong>
+      <div className="card" style={{ display: "grid", gap: 8, padding: 12 }}>
+        <strong style={{ fontSize: 14, letterSpacing: 0.2, textAlign: "center" }}>Prêts</strong>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 4 }}>
           {players
             .filter((p) => !p.isEliminated) // les éliminés ne sont plus dans la liste des prêts
             .map((p) => (
-            <li key={p.id} style={{ display: "flex", justifyContent: "space-between" }}>
-              <span>
-                {p.nickname} {p.isHost ? "(Hôte)" : ""}
-              </span>
-              <span>{p.isReady ? "✅" : "⏳"}</span>
+            <li
+              key={p.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "6px 10px",
+                borderRadius: 8,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>{p.nickname}</span>
+              <span style={{ fontSize: 13 }}>{p.isReady ? "✏️" : "..."}</span>
             </li>
           ))}
         </ul>
       </div>
 
       <button
-        className="btn"
+        className="btn btn-compact"
         disabled={me?.isReady || pendingReady}
         style={{ opacity: me?.isReady || pendingReady ? 0.5 : 1 }}
         onClick={async () => {

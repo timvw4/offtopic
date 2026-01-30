@@ -119,21 +119,28 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   }, [current]);
 
   return (
-    <div className="card" style={{ display: "grid", gap: 8 }} ref={containerRef}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div className="card" style={{ display: "grid", gap: 12, padding: 18 }} ref={containerRef}>
+      <div className="panel" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         {colors.map((c) => (
           <button
             key={c}
-            className="btn"
-            style={{ background: c, color: "#fff" }}
+            className="btn btn-compact"
+            style={{
+              background: c,
+              color: "#fff",
+              width: 48,
+              minWidth: 48,
+              padding: 0,
+              border: "2px solid rgba(255,255,255,0.3)",
+            }}
             onClick={() => setBrushColor(c)}
             aria-label={`Choisir la couleur ${c}`}
           >
             🎨
           </button>
         ))}
-        <label style={{ color: "#e2e8f0" }}>
-          Taille
+        <label style={{ color: "var(--text)", display: "grid", gap: 4 }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>Taille</span>
           <input
             type="range"
             min={2}
@@ -142,21 +149,25 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
             onChange={(e) => setBrushSize(Number(e.target.value))}
           />
         </label>
-        <button className="btn" onClick={undo}>
-          Annuler
-        </button>
-        <button className="btn" onClick={erase}>
+        <button className="btn btn-compact btn-ghost" onClick={undo}>
           Gomme
         </button>
-        <button className="btn" onClick={exportImage} disabled={disabled}>
-          Sauver le dessin
+        <button className="btn btn-compact" onClick={exportImage} disabled={disabled}>
+          Valider
         </button>
       </div>
       <canvas
         ref={canvasRef}
         width={size}
         height={size}
-        style={{ borderRadius: 12, touchAction: "none", background: "#fff", width: "100%", maxWidth: size }}
+        style={{
+          borderRadius: 16,
+          touchAction: "none",
+          background: "#ffffff",
+          width: "100%",
+          maxWidth: size,
+          boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
+        }}
         onMouseDown={start}
         onMouseMove={move}
         onMouseUp={end}

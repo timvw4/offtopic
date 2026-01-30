@@ -7,6 +7,7 @@ type Settings = {
   has_cameleon: boolean;
   has_dictator: boolean;
   drawing_timer_seconds?: number;
+  word_theme?: string | null;
 };
 
 function normalizeSettings(playerCount: number, settings: Settings): Settings {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 
   const { data: room } = await supabaseAdmin
     .from("rooms")
-    .select("current_phase, hors_theme_count, has_cameleon, has_dictator, drawing_timer_seconds")
+    .select("current_phase, hors_theme_count, has_cameleon, has_dictator, drawing_timer_seconds, word_theme")
     .eq("code", roomCode)
     .single();
   assertTransition(room?.current_phase || "LOBBY", "WORD");
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
     has_cameleon: room?.has_cameleon ?? false,
     has_dictator: room?.has_dictator ?? false,
     drawing_timer_seconds: room?.drawing_timer_seconds ?? 60,
+    word_theme: room?.word_theme ?? "general",
   };
 
   const mergedSettings = {
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
       typeof settingsOverride?.drawing_timer_seconds === "number"
         ? settingsOverride.drawing_timer_seconds
         : baseSettings.drawing_timer_seconds,
+    word_theme: typeof settingsOverride?.word_theme === "string" ? settingsOverride.word_theme : baseSettings.word_theme,
   };
 
   const effective = normalizeSettings(players.length, mergedSettings);
@@ -149,9 +152,20 @@ export async function POST(request: Request) {
     await supabaseAdmin.from("players").update({ role: "DICTATOR" }).eq("id", dictatorId);
   }
 
-  // Pick random pair (liste courte, tirage côté application)
-  const { data: pairs } = await supabaseAdmin.from("word_pairs").select("*").limit(10);
-  const chosen = pairs && pairs.length > 0 ? pairs[Math.floor(Math.random() * pairs.length)] : null;
+  const theme = mergedSettings.word_theme || "general";
+
+  // Pick random pair dans le thème (fallback sur general si vide)
+  const { data: themedPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", theme).limit(50);
+  let chosen =
+    themedPairs && themedPairs.length > 0 ? themedPairs[Math.floor(Math.random() * themedPairs.length)] : undefined;
+
+  if (!chosen) {
+    const { data: fallbackPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", "general").limit(50);
+    chosen =
+      fallbackPairs && fallbackPairs.length > 0
+        ? fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)]
+        : undefined;
+  }
 
   // New round
   await supabaseAdmin.from("rounds").insert({
@@ -173,6 +187,8 @@ export async function POST(request: Request) {
       has_cameleon: effective.has_cameleon,
       has_dictator: effective.has_dictator,
       drawing_timer_seconds: timerSeconds,
+      drawing_timer_seconds: timerSeconds,
+      word_theme: theme,
     })
     .eq("code", roomCode);
 

@@ -21,34 +21,31 @@ export default function HomePage() {
   const [mode, setMode] = useState<Mode>(null);
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
-  const [generatedRoom, setGeneratedRoom] = useState<string>("-----");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (mode === "create") {
-      setGeneratedRoom(generateRoomCode());
-    }
-  }, [mode]);
+  const joinReady = nickname.trim().length >= 2 && roomCode.trim().length >= 3;
 
-  const ready =
-    (mode === "create" && nickname.length >= 2) ||
-    (mode === "join" && nickname.length >= 2 && roomCode.length >= 3);
-
-  async function handleContinue() {
-    if (!mode) return;
+  function handleCreate() {
     setError(null);
-    if (!ready) return;
-
-    if (mode === "create") {
-      router.push(`/room/${generatedRoom}?nickname=${encodeURIComponent(nickname || "Hôte")}`);
+    const pseudo = nickname.trim();
+    if (pseudo.length < 2) {
+      setError("Choisis un pseudo (au moins 2 caractères).");
       return;
     }
+    const code = generateRoomCode();
+    router.push(`/room/${code}?nickname=${encodeURIComponent(pseudo || "Hôte")}`);
+  }
 
+  async function handleContinue() {
+    if (mode !== "join") return;
+    setError(null);
+    if (!joinReady) return;
     // Join: vérifier que la salle existe
     try {
       setLoading(true);
-      const { data } = await supabaseClient.from("rooms").select("code, current_phase").eq("code", roomCode).maybeSingle();
+      const code = roomCode.trim().toUpperCase();
+      const { data } = await supabaseClient.from("rooms").select("code, current_phase").eq("code", code).maybeSingle();
       if (!data) {
         setError("Code de salle invalide ou inexistant.");
         return;
@@ -57,65 +54,71 @@ export default function HomePage() {
         setError("Partie déjà en cours, impossible de rejoindre.");
         return;
       }
-      router.push(`/room/${roomCode}?nickname=${encodeURIComponent(nickname)}`);
+      router.push(`/room/${code}?nickname=${encodeURIComponent(nickname.trim())}`);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div
-      className="card"
-      style={{ display: "grid", gap: 24, textAlign: "center", justifyItems: "center", padding: 24 }}
-    >
-      <div>
-        <h1 style={{ margin: 0 }}>OFF-TOPIC</h1>
-        <p style={{ marginTop: 8 }}>Dessine. Devine. Dénonce… ou fais-toi démasquer.</p>
+    <div style={{ display: "grid", gap: 28, padding: 8, maxWidth: 960, margin: "0 auto" }}>
+      <div style={{ display: "grid", gap: 10, textAlign: "center" }}>
+        <h1 style={{ fontSize: 36 }}>OFF-TOPIC</h1>
+        <p style={{ marginTop: 6, fontSize: 16, color: "var(--muted)" }}>
+          Dessine vite, devine mieux, accuse au bon moment. Ambiance tableau noir + croquis à main levée.
+        </p>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-        <button className="btn" onClick={() => setMode("create")}>
-          Créer une partie
-        </button>
-        <button className="btn" onClick={() => setMode("join")}>
-          Rejoindre une partie
-        </button>
-      </div>
-
-      {mode && (
-        <div style={{ display: "grid", gap: 10, width: "100%", maxWidth: 420 }}>
+      <div className="panel" style={{ display: "grid", gap: 14, width: "100%", maxWidth: 520, justifySelf: "center" }}>
+        <label style={{ textAlign: "left", display: "grid", gap: 6 }}>
+          <span style={{ fontWeight: 600 }}>Ton pseudo</span>
           <input
             className="input"
-            placeholder="Ton pseudo"
+            placeholder="Ex: BigbougGius"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
           />
+        </label>
 
-          {mode === "join" && (
-            <input
-              className="input"
-              placeholder="Code de salle (ex: ABC123)"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            />
-          )}
-
-          {mode === "create" && <p>Code généré : {generatedRoom}</p>}
-          {error && <p style={{ color: "#f87171" }}>{error}</p>}
-
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <button className="btn btn-compact" onClick={handleCreate}>
+            Créer une partie
+          </button>
           <button
-            className="btn"
-            disabled={!ready || loading}
-            style={{ opacity: !ready || loading ? 0.5 : 1 }}
-            onClick={handleContinue}
+            className={`btn btn-compact ${mode === "join" ? "" : "btn-ghost"}`}
+            onClick={() => {
+              setMode((m) => (m === "join" ? null : "join"));
+              setError(null);
+            }}
           >
-            {loading ? "Vérification..." : "Continuer"}
+            Rejoindre une partie
           </button>
         </div>
-      )}
-      <Link href="/rules" className="btn" style={{ marginTop: 8 }}>
-        Règles
-      </Link>
+
+        {mode === "join" && (
+          <div style={{ display: "grid", gap: 10, width: "100%" }}>
+            <label style={{ textAlign: "left", display: "grid", gap: 6 }}>
+              <span style={{ fontWeight: 600 }}>Code de salle</span>
+              <input
+                className="input"
+                placeholder="Ex: ABC23"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              />
+            </label>
+            {error && <p style={{ color: "#f87171" }}>{error}</p>}
+
+            <button
+              className="btn btn-compact"
+              disabled={!joinReady || loading}
+              style={{ opacity: !joinReady || loading ? 0.5 : 1 }}
+              onClick={handleContinue}
+            >
+              {loading ? "Vérification..." : "Continuer"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

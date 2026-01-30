@@ -151,18 +151,28 @@ export default function VotePage() {
   }, [phase, isEliminated, nickname, params.roomCode, router]);
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <h2>Vote</h2>
       {tieIds.length > 0 && <p>Égalité précédente : revote uniquement entre les ex æquo.</p>}
-      <div className="card">
+      <div className="card" style={{ display: "grid", gap: 10 }}>
         <h4>Statut des votes</h4>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 4 }}>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
           {eligiblePlayers.map((p) => {
             const voted = votes.some((v) => v.voter_nickname === p.nickname && (!roundId || v.round_id === roundId));
             return (
-              <li key={p.id} style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>{p.nickname}</span>
-                <span>{voted ? "✅" : "⏳"}</span>
+              <li
+                key={p.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>{p.nickname}</span>
+                <span>{voted ? "✉️" : "..."}</span>
               </li>
             );
           })}
@@ -175,7 +185,8 @@ export default function VotePage() {
         accusationAvailable={hasCameleon && accusationAvailable}
         showAccusation={hasCameleon}
         disableAccusation={isCameleonSelf || choiceLocked === "vote"}
-        disableVote={choiceLocked === "accuse"}
+        disableVote={choiceLocked === "accuse" || voteSubmitted}
+        hideVoteButton={voteSubmitted}
         onVote={async (playerId) => {
           setChoiceLocked("vote");
           await fetch("/api/vote", {

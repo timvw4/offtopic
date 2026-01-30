@@ -129,13 +129,23 @@ export default function RevealPage() {
   }, [phase, nickname, params.roomCode, router]);
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <h2>Révélation des dessins</h2>
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
         {drawings
           .filter((d) => d.data_url && d.nickname) // sécurité
           .map((d) => (
-          <div key={d.id} className="card">
+          <div
+            key={d.id}
+            className="card"
+            style={{
+              display: "grid",
+              gap: 8,
+              background: "#ffffff",
+              color: "#0b0f1a",
+              border: "2px solid rgba(11,15,26,0.06)",
+            }}
+          >
             <strong>{d.nickname}</strong>
             <Image
               src={d.data_url}
@@ -150,7 +160,7 @@ export default function RevealPage() {
       </div>
       {isHost ? (
         <button
-          className="btn"
+          className="btn btn-compact"
           disabled={!allDrawingsDone}
           style={{ opacity: allDrawingsDone ? 1 : 0.5 }}
           onClick={async () => {

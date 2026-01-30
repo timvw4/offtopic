@@ -303,12 +303,42 @@ export default function ResultsPage() {
 
   const horsThemeMinoritaire = horsThemeAlive < alivePlayers.length / 2;
 
+  async function goToLobbyAndMaybeReset() {
+    const room = params.roomCode;
+    // Marque ce joueur comme de retour au lobby
+    await supabaseClient
+      .from("players")
+      .update({ is_in_lobby: true })
+      .eq("room_code", room)
+      .eq("nickname", nickname);
+
+    // Vérifie si tout le monde est revenu au lobby
+    const { data: allPlayers } = await supabaseClient
+      .from("players")
+      .select("nickname, is_in_lobby, is_host")
+      .eq("room_code", room);
+
+    const everyoneBack = (allPlayers || []).every((p) => p.is_in_lobby === true);
+    const hostNick = (allPlayers || []).find((p) => p.is_host)?.nickname;
+    const iAmHost = hostNick === nickname;
+
+    if (everyoneBack && iAmHost) {
+      // Un seul reset, déclenché par l'hôte quand tous sont au lobby
+      await fetch("/api/game/reset", {
+        method: "POST",
+        body: JSON.stringify({ roomCode: room }),
+      });
+    }
+
+    router.replace(`/room/${room}?nickname=${encodeURIComponent(nickname)}`);
+  }
+
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <h2>Résultat du tour</h2>
       {loading && <p>Résolution des votes…</p>}
       {computedTieIds.length > 0 && (
-        <div className="card" style={{ display: "grid", gap: 8 }}>
+        <div className="card result-pop" style={{ display: "grid", gap: 8 }}>
           <strong>Égalité détectée</strong>
           <p>Revote uniquement entre :</p>
           <ul style={{ paddingLeft: 16, margin: 0 }}>
@@ -337,13 +367,13 @@ export default function ResultsPage() {
         </div>
       )}
       {dictatorSurvived ? (
-        <div className="card" style={{ display: "grid", gap: 6 }}>
+        <div className="card result-pop" style={{ display: "grid", gap: 6 }}>
           <strong>Le Dictateur a survécu</strong>
           <p style={{ margin: 0 }}>Immunité utilisée. Son prochain vote comptera double.</p>
           <p style={{ margin: 0 }}>Aucun joueur n&apos;est éliminé ce tour.</p>
         </div>
       ) : eliminated ? (
-        <div className="card">
+        <div className="card result-pop" style={{ display: "grid", gap: 6 }}>
           <strong>{eliminated.nickname}</strong> est éliminé.
           <p>Rôle révélé : {eliminated.role}</p>
           {result?.is_chameleon === true && <p>Le Caméléon a été éliminé → victoire Caméléon.</p>}
@@ -358,7 +388,7 @@ export default function ResultsPage() {
 
       <div className="card">
         <h4>Votes</h4>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 4 }}>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
           {players
             .filter((p) => !p.isEliminated || p.id === result?.eliminated_player_id)
             .map((p) => {
@@ -371,6 +401,10 @@ export default function ResultsPage() {
                   display: "flex",
                   justifyContent: "space-between",
                   color: isTop ? "#f97316" : undefined,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
                 }}
               >
                 <span>{p.nickname}</span>
@@ -381,7 +415,12 @@ export default function ResultsPage() {
         </ul>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Bouton Retour au lobby toujours visible pour tous */}
+        <button className="btn" onClick={goToLobbyAndMaybeReset}>
+          Retour au lobby
+        </button>
+
         {dictatorSurvived ? (
           isHost ? (
             <button
@@ -403,57 +442,29 @@ export default function ResultsPage() {
             >
               Prochain tour
             </button>
-          ) : (
-            <span style={{ alignSelf: "center" }}>En attente de l&apos;hôte pour lancer le prochain tour…</span>
-          )
-        ) : horsThemeAlive === 0 || cameleonWin ? (
-          <button
-            className="btn"
-            onClick={async () => {
-              await fetch("/api/game/reset", {
-                method: "POST",
-                body: JSON.stringify({ roomCode: params.roomCode }),
-              });
-              router.replace(`/room/${params.roomCode}?nickname=${encodeURIComponent(nickname)}`);
-            }}
-          >
-            Retour au lobby
-          </button>
-        ) : horsThemeWin ? (
-        <button
-          className="btn"
-          onClick={async () => {
-            await fetch("/api/game/reset", {
-              method: "POST",
-              body: JSON.stringify({ roomCode: params.roomCode }),
-            });
-            router.replace(`/room/${params.roomCode}?nickname=${encodeURIComponent(nickname)}`);
-          }}
-        >
-            Retour au lobby
-        </button>
+          ) : null
         ) : hostCanStartNewRound ? (
           isHost ? (
-        <button
-          className="btn"
-          onClick={async () => {
+            <button
+              className="btn"
+              onClick={async () => {
                 const resp = await fetch("/api/game/next", {
-              method: "POST",
-              body: JSON.stringify({ roomCode: params.roomCode }),
-            });
+                  method: "POST",
+                  body: JSON.stringify({ roomCode: params.roomCode }),
+                });
                 if (resp.ok) {
                   const data = await resp.json();
                   const t = data?.timerSeconds ?? 60;
                   setPhase("DRAW");
-                  router.replace(`/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`);
+                  router.replace(
+                    `/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`,
+                  );
                 }
-          }}
-        >
+              }}
+            >
               Prochain tour
-        </button>
-          ) : (
-            <span style={{ alignSelf: "center" }}>En attente de l&apos;hôte pour lancer le prochain tour…</span>
-          )
+            </button>
+          ) : null
         ) : null}
       </div>
     </div>

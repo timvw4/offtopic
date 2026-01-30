@@ -1,0 +1,43 @@
+-- Ajoute 50 paires supplémentaires et 2 nouveaux thèmes : sport, technologie.
+
+insert into public.word_pairs (word_fr_civil, word_fr_hors_theme, word_en_civil, word_en_hors_theme, theme)
+values
+  -- Sport (25)
+  ('football', 'rugby', 'football', 'rugby', 'sport'),
+  ('basketball', 'handball', 'basketball', 'handball', 'sport'),
+  ('tennis', 'badminton', 'tennis', 'badminton', 'sport'),
+  ('golf', 'mini-golf', 'golf', 'mini golf', 'sport'),
+  ('ski', 'snowboard', 'ski', 'snowboard', 'sport'),
+  ('surf', 'kayak', 'surf', 'kayak', 'sport'),
+  ('natation', 'plongée', 'swimming', 'diving', 'sport'),
+  ('escalade', 'randonnée', 'climbing', 'hiking', 'sport'),
+  ('boxe', 'escrime', 'boxing', 'fencing', 'sport'),
+  ('patinage', 'roller', 'ice skating', 'roller skating', 'sport'),
+  ('voile', 'aviron', 'sailing', 'rowing', 'sport'),
+  ('pétanque', 'bowling', 'petanque', 'bowling', 'sport'),
+  ('karaté', 'judo', 'karate', 'judo', 'sport'),
+  ('cyclisme', 'bmx', 'cycling', 'bmx', 'sport'),
+  ('triathlon', 'ironman', 'triathlon', 'ironman', 'sport'),
+  ('parachute', 'parapente', 'parachute', 'paragliding', 'sport'),
+  ('lancer de javelot', 'lancer de disque', 'javelin throw', 'discus throw', 'sport'),
+  ('haltérophilie', 'musculation', 'weightlifting', 'gym', 'sport'),
+  ('équitation', 'polo', 'horse riding', 'polo', 'sport'),
+  ('ping-pong', 'squash', 'table tennis', 'squash', 'sport'),
+  ('water-polo', 'natation', 'water polo', 'swimming', 'sport'),
+
+  -- Technologie (25)
+  ('ordinateur', 'tablette', 'computer', 'tablet', 'technologie'),
+  ('smartphone', 'montre connectée', 'smartphone', 'smartwatch', 'technologie'),
+  ('drone', 'satellite', 'drone', 'satellite', 'technologie'),
+  ('robot', 'imprimante 3d', 'robot', '3d printer', 'technologie'),
+  ('console', 'manette', 'console', 'controller', 'technologie'),
+  ('appareil photo', 'caméra', 'camera', 'camcorder', 'technologie'),
+  ('clé usb', 'disque dur', 'usb stick', 'hard drive', 'technologie'),
+  ('micro', 'enceinte', 'microphone', 'speaker', 'technologie'),
+  ('projecteur', 'écran', 'projector', 'screen', 'technologie'),
+  ('routeur wifi', 'répéteur', 'wifi router', 'repeater', 'technologie'),
+  ('antenne', 'satellite', 'antenna', 'satellite dish', 'technologie'),
+  ('carte mère', 'carte graphique', 'motherboard', 'graphics card', 'technologie'),
+  ('processeur', 'mémoire', 'cpu', 'ram', 'technologie'),
+  ('câble hdmi', 'câble usb', 'hdmi cable', 'usb cable', 'technologie'),
+  ('chargeur', 'batterie externe', 'charger', 'power bank', 'technologie'),

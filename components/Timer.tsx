@@ -29,7 +29,16 @@ export function Timer({ duration, onExpire, running = true, tickMs = 1000 }: Pro
   }, [duration, onExpire, running, tickMs]);
 
   return (
-    <div className="card" style={{ fontWeight: 700, textAlign: "center" }}>
+    <div
+      className="card"
+      style={{
+        fontWeight: 700,
+        textAlign: "center",
+        fontSize: 18,
+        background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
+        border: "1px solid rgba(255,255,255,0.14)",
+      }}
+    >
       ⏱️ {remaining}s
     </div>
   );

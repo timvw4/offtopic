@@ -11,6 +11,7 @@ interface Props {
   showAccusation?: boolean;
   disableAccusation?: boolean;
   disableVote?: boolean;
+  hideVoteButton?: boolean;
 }
 
 export function VotePanel({
@@ -21,31 +22,46 @@ export function VotePanel({
   showAccusation = true,
   disableAccusation = false,
   disableVote = false,
+  hideVoteButton = false,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedAccuse, setSelectedAccuse] = useState<string | null>(null);
 
   return (
-    <div className="card" style={{ display: "grid", gap: 8 }}>
+    <div className="card" style={{ display: "grid", gap: 10, padding: 16 }}>
       <h3>Vote secret: éliminer un Hors-Thème</h3>
       {players
         .filter((p) => !p.isEliminated)
         .map((p) => (
-          <label key={p.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <label
+            key={p.id}
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
             <input
               type="radio"
               name="vote"
               value={p.id}
               checked={selected === p.id}
-                disabled={disableVote}
-                onChange={() => setSelected(p.id)}
+              disabled={disableVote}
+              onChange={() => setSelected(p.id)}
+              style={{ accentColor: "#ffffff", width: 18, height: 18 }}
             />
-            {p.nickname}
+            <span style={{ fontWeight: 600 }}>{p.nickname}</span>
           </label>
         ))}
-      <button className="btn" disabled={!selected || disableVote} onClick={() => selected && onVote(selected)}>
-        Voter
-      </button>
+      {!hideVoteButton && (
+        <button className="btn btn-compact" disabled={!selected || disableVote} onClick={() => selected && onVote(selected)}>
+          Voter
+        </button>
+      )}
       {showAccusation && (
         <>
           <hr />
@@ -56,7 +72,7 @@ export function VotePanel({
               .map((p) => (
                 <button
                   key={p.id}
-                  className="btn"
+                  className="btn btn-compact"
                   disabled={!accusationAvailable || disableAccusation}
                   style={{
                     opacity: !accusationAvailable || disableAccusation ? 0.5 : 1,

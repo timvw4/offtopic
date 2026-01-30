@@ -15,6 +15,7 @@ type RoomSettings = {
   host_nickname?: string | null;
   current_phase?: string | null;
   drawing_timer_seconds?: number;
+  word_theme?: string | null;
 };
 
 function mapPlayerRow(row: any): Player {
@@ -49,8 +50,10 @@ export default function LobbyPage() {
     has_cameleon: false,
   has_dictator: false,
     drawing_timer_seconds: 60,
+    word_theme: "general",
   });
   const [showCamTooltip, setShowCamTooltip] = useState(false);
+  const [showDictTooltip, setShowDictTooltip] = useState(false);
 const [showRolesList, setShowRolesList] = useState(false);
 
   const playerCount = players.length;
@@ -58,6 +61,17 @@ const [showRolesList, setShowRolesList] = useState(false);
   const selectedHt = options.includes(settings.hors_theme_count) ? settings.hors_theme_count : options[0];
 const selectedCam = settings.has_cameleon ?? false;
 const selectedDict = settings.has_dictator ?? false;
+  const selectedTheme = settings.word_theme || "general";
+
+  const themes = [
+    { value: "general", label: "Général" },
+    { value: "animaux", label: "Animaux" },
+    { value: "nourriture", label: "Nourriture" },
+    { value: "voyage", label: "Voyage" },
+    { value: "objets", label: "Objets du quotidien" },
+    { value: "sport", label: "Sport" },
+    { value: "technologie", label: "Technologie" },
+  ];
 
   const isHost = useMemo(() => settings.host_nickname === nickname, [settings.host_nickname, nickname]);
 
@@ -87,6 +101,7 @@ const selectedDict = settings.has_dictator ?? false;
             has_cameleon: false,
             has_dictator: false,
             current_phase: "LOBBY",
+            word_theme: "general",
           })
           .select();
       }
@@ -98,6 +113,7 @@ const selectedDict = settings.has_dictator ?? false;
         host_nickname: hostNickname,
         current_phase: roomRow?.current_phase ?? "LOBBY",
         drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
+        word_theme: roomRow?.word_theme ?? "general",
       });
 
       const amHost = hostNickname === nickname;
@@ -144,6 +160,7 @@ const selectedDict = settings.has_dictator ?? false;
               host_nickname: n?.host_nickname ?? prev.host_nickname,
               current_phase: n?.current_phase ?? prev.current_phase,
               drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
+              word_theme: n?.word_theme ?? prev.word_theme ?? "general",
             }));
           },
         )
@@ -193,10 +210,19 @@ const selectedDict = settings.has_dictator ?? false;
     return () => clearInterval(id);
   }, [nickname, params.roomCode, router]);
 
-  async function updateRoomSettings(hors_theme_count: number, has_cameleon: boolean, has_dictator: boolean) {
+  async function updateRoomSettings(
+    hors_theme_count: number,
+    has_cameleon: boolean,
+    has_dictator: boolean,
+    word_theme?: string,
+  ) {
     const room = params.roomCode;
-    setSettings((s) => ({ ...s, hors_theme_count, has_cameleon, has_dictator }));
-    await supabaseClient.from("rooms").update({ hors_theme_count, has_cameleon, has_dictator }).eq("code", room);
+    const nextTheme = word_theme ?? settings.word_theme ?? "general";
+    setSettings((s) => ({ ...s, hors_theme_count, has_cameleon, has_dictator, word_theme: nextTheme }));
+    await supabaseClient
+      .from("rooms")
+      .update({ hors_theme_count, has_cameleon, has_dictator, word_theme: nextTheme })
+      .eq("code", room);
   }
 
   async function updateTimer(seconds: number) {
@@ -208,19 +234,33 @@ const selectedDict = settings.has_dictator ?? false;
   const startDisabled = playerCount < 3 || playerCount > 8;
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <h2>Lobby</h2>
       <PlayerList players={players} showStatus={false} dimEliminated={false} />
 
       {isHost && (
-        <div className="card" style={{ display: "grid", gap: 8 }}>
+        <div className="card" style={{ display: "grid", gap: 10 }}>
           <h4>Paramètres de rôle (Hôte)</h4>
+          <label style={{ display: "grid", gap: 6 }}>
+            Thème des mots
+            <select
+              className="input"
+              value={selectedTheme}
+              onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.value)}
+            >
+              {themes.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label style={{ display: "grid", gap: 6 }}>
             Hors-Thème
             <select
               className="input"
               value={selectedHt}
-              onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict)}
+              onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedTheme)}
             >
               {options.map((opt) => (
                 <option key={opt} value={opt}>
@@ -229,16 +269,30 @@ const selectedDict = settings.has_dictator ?? false;
               ))}
             </select>
           </label>
-          <button type="button" className="btn" onClick={() => setShowRolesList((v) => !v)}>
+          <button
+            type="button"
+            className="btn btn-compact btn-ghost"
+            style={{ border: "1.5px solid rgba(250, 204, 21, 0.7)", color: "#facc15" }}
+            onClick={() => setShowRolesList((v) => !v)}
+          >
             Ajoute des rôles
           </button>
           {showRolesList && (
-            <div style={{ display: "grid", gap: 8, padding: 8, border: "1px solid #e5e5e5", borderRadius: 8 }}>
+            <div
+              style={{
+                display: "grid",
+                gap: 8,
+                padding: 10,
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.04)",
+              }}
+            >
               <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <input
                   type="checkbox"
                   checked={selectedCam}
-                  onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict)}
+                  onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
                 />
                 <Image src="/roles/chameleon.png" alt="Caméléon" width={40} height={40} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
@@ -261,7 +315,7 @@ const selectedDict = settings.has_dictator ?? false;
                       )}
                     </span>
                   </div>
-                  <small style={{ color: "#999" }}>
+                  <small style={{ color: "var(--muted)" }}>
                     Le Caméléon connaît le mot mais doit se faire passer pour un joueur Hors-Thème sans se faire démasquer.
                   </small>
                 </div>
@@ -270,19 +324,35 @@ const selectedDict = settings.has_dictator ?? false;
                 <input
                   type="checkbox"
                   checked={selectedDict}
-                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked)}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
                 />
                 <Image src="/roles/dictator.png" alt="Dictateur" width={40} height={40} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span>Dictateur</span>
+                    <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      Dictateur
+                      <button
+                        type="button"
+                        className="tooltip-icon"
+                        aria-label="Infos Dictateur"
+                        onClick={() => setShowDictTooltip((v) => !v)}
+                      >
+                        i
+                      </button>
+                      {showDictTooltip && (
+                        <div className="tooltip-content">
+                          Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
+                          Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
+                        </div>
+                      )}
+                    </span>
                   </div>
-                  <small style={{ color: "#999" }}>
+                  <small style={{ color: "var(--muted)" }}>
                     Si la majorité vote contre lui une première fois, il survit et son prochain vote compte double.
                   </small>
                 </div>
               </label>
-              <p style={{ margin: 0, fontSize: 13, color: "#888" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
             </div>
           )}
           <label style={{ display: "grid", gap: 6 }}>
@@ -303,29 +373,30 @@ const selectedDict = settings.has_dictator ?? false;
       )}
 
       {isHost ? (
-        <button
-          className="btn"
+      <button
+        className="btn"
           disabled={startDisabled}
           style={{ opacity: startDisabled ? 0.5 : 1 }}
-          onClick={async () => {
-            const resp = await fetch("/api/game/start", {
-              method: "POST",
-              body: JSON.stringify({
-                roomCode: params.roomCode,
-                settings: {
-                  hors_theme_count: selectedHt,
-                  has_cameleon: selectedCam,
-                  has_dictator: selectedDict,
-                  drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
-                },
-              }),
-            });
-            if (!resp.ok) return;
-            router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
-          }}
-        >
+        onClick={async () => {
+          const resp = await fetch("/api/game/start", {
+            method: "POST",
+            body: JSON.stringify({
+              roomCode: params.roomCode,
+              settings: {
+                hors_theme_count: selectedHt,
+                has_cameleon: selectedCam,
+                has_dictator: selectedDict,
+                word_theme: selectedTheme,
+                drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
+              },
+            }),
+          });
+          if (!resp.ok) return;
+          router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
+        }}
+      >
           Démarrer
-        </button>
+      </button>
       ) : (
         <p>En attente de l&apos;hôte pour lancer la partie.</p>
       )}

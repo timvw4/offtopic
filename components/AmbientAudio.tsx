@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const SOURCE = "/ambiance.wav";
+const SOURCE = "/embience.wav"; // veille à ce que le fichier soit présent dans public/
 
 export function AmbientAudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -40,9 +40,9 @@ export function AmbientAudio() {
     if (!audio) return;
     try {
       if (audio.paused) {
+        setError(null);
         await audio.play();
         setPlaying(true);
-        setError(null);
       } else {
         audio.pause();
         setPlaying(false);

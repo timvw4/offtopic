@@ -13,7 +13,7 @@ export function AmbientAudio() {
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.1;
+    audio.volume = 0.01;
     audioRef.current = audio;
 
     const tryPlay = async () => {

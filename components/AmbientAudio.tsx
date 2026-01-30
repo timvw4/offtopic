@@ -13,25 +13,35 @@ export function AmbientAudio() {
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.15;
+    audio.volume = 0.1;
     audioRef.current = audio;
 
     const tryPlay = async () => {
       try {
+        setError(null);
         await audio.play();
         setPlaying(true);
       } catch (err) {
         // Autoplay bloqué : on affiche le bouton pour déclencher manuellement
         setPlaying(false);
-        setError("Clique pour lancer la musique");
+        setError("Autoplay bloqué, clique pour lancer.");
       }
     };
 
+    // tentative auto au chargement
     void tryPlay();
+
+    // tentative dès la première interaction utilisateur (débloque l'autoplay)
+    const onFirstInteract = () => {
+      void tryPlay();
+      document.removeEventListener("pointerdown", onFirstInteract);
+    };
+    document.addEventListener("pointerdown", onFirstInteract, { once: true });
 
     return () => {
       audio.pause();
       audioRef.current = null;
+      document.removeEventListener("pointerdown", onFirstInteract);
     };
   }, []);
 

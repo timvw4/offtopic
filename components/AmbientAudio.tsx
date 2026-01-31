@@ -13,7 +13,7 @@ export function AmbientAudio() {
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.6; // ajuste ici si trop faible ou trop fort (0.0 à 1.0)
+    audio.volume = 1.0; // ajuste ici si trop faible ou trop fort (0.0 à 1.0)
     audioRef.current = audio;
 
     const tryPlay = async () => {
@@ -63,7 +63,20 @@ export function AmbientAudio() {
   }
 
   return (
-    <div className="audio-floating" style={{ right: 12, left: "auto", justifyItems: "end" }}>
+    <div
+      className="audio-floating"
+      style={{
+        right: 16,
+        left: "auto",
+        transform: "none",
+        bottom: 20,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 4,
+        textAlign: "center",
+      }}
+    >
       <button
         className="btn btn-compact btn-ghost"
         style={{

@@ -272,10 +272,50 @@ const selectedDict = settings.has_dictator ?? false;
           <button
             type="button"
             className="btn btn-compact btn-ghost"
-            style={{ border: "1.5px solid rgba(250, 204, 21, 0.7)", color: "#facc15" }}
+            style={{
+              border: "1.5px solid rgba(250, 204, 21, 0.7)",
+              color: "#fff",
+              background: "rgba(0, 0, 0, 0.82)",
+              position: "relative",
+              overflow: "hidden",
+              height: 64,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+            }}
             onClick={() => setShowRolesList((v) => !v)}
           >
-            Ajoute des rôles
+            <Image
+              src="/roles.png"
+              alt="Illustration des rôles"
+              fill
+              sizes="320px"
+              style={{ objectFit: "cover", opacity: 0.8 }}
+              priority
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.5)",
+                zIndex: 1,
+                pointerEvents: "none",
+              }}
+            />
+            <span
+              style={{
+                position: "relative",
+                zIndex: 2,
+                fontWeight: 700,
+                fontSize: 22,
+                textShadow: "0 2px 6px rgba(0, 0, 0, 0.35)",
+              }}
+            >
+              Ajoute des rôles
+            </span>
           </button>
           {showRolesList && (
             <div
@@ -353,6 +393,42 @@ const selectedDict = settings.has_dictator ?? false;
                 </div>
               </label>
               <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
+            </div>
+          )}
+          {(selectedCam || selectedDict) && (
+            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "6px 2px" }}>
+              {selectedCam && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 10px",
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  <Image src="/roles/chameleon.png" alt="Caméléon sélectionné" width={32} height={32} />
+                  <span style={{ fontWeight: 700 }}>Caméléon</span>
+                </div>
+              )}
+              {selectedDict && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 10px",
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  <Image src="/roles/dictator.png" alt="Dictateur sélectionné" width={32} height={32} />
+                  <span style={{ fontWeight: 700 }}>Dictateur</span>
+                </div>
+              )}
             </div>
           )}
           <label style={{ display: "grid", gap: 6 }}>

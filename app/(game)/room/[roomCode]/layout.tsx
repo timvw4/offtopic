@@ -26,7 +26,8 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
     <div style={{ display: "grid", gap: 12 }}>
       <header className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <strong>Salle</strong> {params.roomCode}
+          <strong>Salle</strong>{" "}
+          <span style={{ color: "#facc15", fontWeight: 800, letterSpacing: 0.4 }}>{params.roomCode}</span>
         </div>
         <button
           className="btn btn-compact btn-ghost"

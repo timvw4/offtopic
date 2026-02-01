@@ -21,12 +21,17 @@ export default function RevealPage() {
   const [phase, setPhase] = useState<string | null>(null);
   const [expectedDrawings, setExpectedDrawings] = useState<number | null>(null);
   const [isEliminated, setIsEliminated] = useState(false);
+  const [drawStartsAt, setDrawStartsAt] = useState<string | null>(null);
+  const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [revealReady, setRevealReady] = useState(false);
 
   useEffect(() => {
     const room = params.roomCode;
     let channel: ReturnType<typeof supabaseClient.channel> | null = null;
     let pollId: NodeJS.Timeout | null = null;
     let pollDrawings: NodeJS.Timeout | null = null;
+    let pollRound: NodeJS.Timeout | null = null;
 
     supabaseClient
       .from("drawings")
@@ -41,6 +46,18 @@ export default function RevealPage() {
       .eq("room_code", room)
       .eq("is_eliminated", false)
       .then(({ count }) => setExpectedDrawings(count ?? null));
+
+    supabaseClient
+      .from("rounds")
+      .select("draw_starts_at, timer_seconds")
+      .eq("room_code", room)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        setDrawStartsAt(data?.draw_starts_at ?? null);
+        setTimerSeconds(data?.timer_seconds ?? null);
+      });
 
     supabaseClient
       .from("players")
@@ -78,6 +95,14 @@ export default function RevealPage() {
             .then(({ data }) => setDrawings((data as DrawingRow[]) || []));
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "rounds", filter: `room_code=eq.${room}` },
+        ({ new: n }) => {
+          setDrawStartsAt(n?.draw_starts_at ?? null);
+          setTimerSeconds(n?.timer_seconds ?? null);
+        },
+      )
       .subscribe();
 
     // Polling de secours pour phase si Realtime ne passe pas
@@ -99,10 +124,25 @@ export default function RevealPage() {
         .then(({ data }) => setDrawings((data as DrawingRow[]) || []));
     }, 2000);
 
+    pollRound = setInterval(() => {
+      supabaseClient
+        .from("rounds")
+        .select("draw_starts_at, timer_seconds")
+        .eq("room_code", room)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+        .then(({ data }) => {
+          setDrawStartsAt(data?.draw_starts_at ?? null);
+          setTimerSeconds(data?.timer_seconds ?? null);
+        });
+    }, 1500);
+
     return () => {
       channel?.unsubscribe();
       if (pollId) clearInterval(pollId);
       if (pollDrawings) clearInterval(pollDrawings);
+      if (pollRound) clearInterval(pollRound);
     };
   }, [nickname, params.roomCode]);
 
@@ -111,6 +151,31 @@ export default function RevealPage() {
     () => expectedDrawings !== null && drawings.length >= expectedDrawings,
     [drawings.length, expectedDrawings],
   );
+
+  const timerDeadline = useMemo(() => {
+    if (!drawStartsAt || !timerSeconds) return null;
+    return new Date(drawStartsAt).getTime() + timerSeconds * 1000;
+  }, [drawStartsAt, timerSeconds]);
+
+  const timerExpired = useMemo(() => {
+    if (!timerDeadline) return false;
+    return now >= timerDeadline;
+  }, [now, timerDeadline]);
+
+  const revealUnlocked = useMemo(() => allDrawingsDone || timerExpired, [allDrawingsDone, timerExpired]);
+
+  // Lance le flip 1.5s après le déblocage (tous les dessins reçus ou timer écoulé)
+  useEffect(() => {
+    let id: NodeJS.Timeout | null = null;
+    if (revealUnlocked) {
+      id = setTimeout(() => setRevealReady(true), 1500);
+    } else {
+      setRevealReady(false);
+    }
+    return () => {
+      if (id) clearTimeout(id);
+    };
+  }, [revealUnlocked]);
 
   // S'assure que la phase passe à REVEAL (sinon le passage à VOTE échoue avec DRAW→VOTE)
   useEffect(() => {
@@ -128,9 +193,39 @@ export default function RevealPage() {
     }
   }, [phase, nickname, params.roomCode, router]);
 
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <h2>Révélation des dessins</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: "#facc15",
+            border: "3px solid rgba(234,179,8,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 800,
+            fontSize: 14,
+            color: "#0b0f1a",
+            boxShadow: "0 8px 18px rgba(0,0,0,0.35)",
+            transition: "opacity 0.4s ease, transform 0.4s ease",
+            opacity: revealReady ? 0 : 1,
+            transform: revealReady ? "scale(0.8) translateY(-6px)" : "none",
+            pointerEvents: "none",
+          }}
+        >
+          {drawings.length}
+          {expectedDrawings !== null ? `/${expectedDrawings}` : ""}
+        </div>
+      </div>
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
         {drawings
           .filter((d) => d.data_url && d.nickname) // sécurité
@@ -141,28 +236,89 @@ export default function RevealPage() {
             style={{
               display: "grid",
               gap: 8,
-              background: "#ffffff",
+              background: "transparent",
               color: "#0b0f1a",
-              border: "2px solid rgba(11,15,26,0.06)",
+              border: "2px solid rgba(11,15,26,0.08)",
             }}
           >
-            <strong>{d.nickname}</strong>
-            <Image
-              src={d.data_url}
-              alt={`Dessin de ${d.nickname}`}
-              width={400}
-              height={300}
-              style={{ width: "100%", height: "auto", borderRadius: 8 }}
-              unoptimized
-            />
+            <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", perspective: "1200px" }}>
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: 10,
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                  transformStyle: "preserve-3d",
+                  transition: "transform 0.7s ease",
+                  transform: revealReady ? "rotateY(0deg)" : "rotateY(180deg)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backfaceVisibility: "hidden",
+                    overflow: "hidden",
+                    borderRadius: 10,
+                    background: "#ffffff",
+                  }}
+                >
+                  <Image
+                    src={d.data_url}
+                    alt={`Dessin de ${d.nickname}`}
+                    fill
+                    sizes="320px"
+                    style={{ objectFit: "contain", background: "#ffffff" }}
+                    unoptimized
+                  />
+                </div>
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backfaceVisibility: "hidden",
+                    transform: "rotateY(180deg)",
+                    overflow: "hidden",
+                    borderRadius: 10,
+                  }}
+                >
+                  <Image
+                    src="/backcard.png"
+                    alt="Dos de carte"
+                    fill
+                    sizes="320px"
+                    style={{ objectFit: "cover" }}
+                    priority={false}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "flex-end",
+                      justifyContent: "center",
+                      padding: 10,
+                      background: "linear-gradient(transparent 55%, rgba(0,0,0,0.65))",
+                      color: "#ffffff",
+                      fontWeight: 700,
+                      letterSpacing: 0.2,
+                      textShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    {d.nickname}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <strong style={{ textAlign: "center" }}>{d.nickname}</strong>
           </div>
         ))}
       </div>
       {isHost ? (
         <button
           className="btn btn-compact"
-          disabled={!allDrawingsDone}
-          style={{ opacity: allDrawingsDone ? 1 : 0.5 }}
+          disabled={!revealUnlocked}
+          style={{ opacity: revealUnlocked ? 1 : 0.5 }}
           onClick={async () => {
             // Met à jour la phase pour synchroniser tous les joueurs
             const resp = await fetch("/api/phase/vote", {
@@ -179,7 +335,12 @@ export default function RevealPage() {
       ) : (
         <p>En attente de l&apos;hôte pour passer au vote…</p>
       )}
-      {isHost && !allDrawingsDone && <p>En attente que tous les dessins soient soumis…</p>}
+      {!revealUnlocked && (
+        <p>
+          Dessins reçus : {drawings.length}
+          {expectedDrawings !== null ? `/${expectedDrawings}` : ""}. Les cartes se retournent quand tous ont soumis ou à la fin du timer.
+        </p>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ export function AmbientAudio() {
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.15; // ajuste ici si trop faible ou trop fort (0.0 à 1.0)
+    audio.volume = 0.05; // ajuste ici si trop faible ou trop fort (0.0 à 1.0)
     audioRef.current = audio;
 
     const tryPlay = async () => {
@@ -24,7 +24,7 @@ export function AmbientAudio() {
       } catch (err) {
         // Autoplay bloqué : on affiche le bouton pour déclencher manuellement
         setPlaying(false);
-        setError("Autoplay bloqué.");
+        setError("");
       }
     };
 
@@ -66,10 +66,6 @@ export function AmbientAudio() {
     <div
       className="audio-floating"
       style={{
-        right: 16,
-        left: "auto",
-        transform: "none",
-        bottom: 20,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -90,7 +86,7 @@ export function AmbientAudio() {
         }}
         onClick={toggle}
       >
-        {playing ? "⏸️ OFF" : "▶️ ON"}
+        {playing ? "▶️ ON" : "⏸️ OFF"}
       </button>
       {error && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#e5e7eb" }}>{error}</p>}
     </div>

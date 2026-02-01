@@ -285,6 +285,8 @@ export default function ResultsPage() {
   const hostCanStartNewRound =
     !civilsWin && !cameleonWin && eliminatedRole !== "HORS_THEME" && horsThemeAlive < alivePlayers.length / 2 && !dictatorSurvived;
 
+  const hasTie = computedTieIds.length > 0;
+
   const outcome = useMemo(() => {
     if (result?.is_chameleon === true) {
       return "Caméléon gagne (éliminé sans accusation correcte)";
@@ -416,10 +418,12 @@ export default function ResultsPage() {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {/* Bouton Retour au lobby toujours visible pour tous */}
-        <button className="btn" onClick={goToLobbyAndMaybeReset}>
-          Retour au lobby
-        </button>
+        {/* Pas de retour lobby tant que l'égalité n'est pas résolue */}
+        {!hasTie && (
+          <button className="btn" onClick={goToLobbyAndMaybeReset}>
+            Retour au lobby
+          </button>
+        )}
 
         {dictatorSurvived ? (
           isHost ? (

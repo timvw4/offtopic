@@ -8,7 +8,23 @@ export async function POST(request: Request) {
   if (!roomCode) return NextResponse.json({ error: "roomCode manquant" }, { status: 400 });
 
   const { data: room } = await supabaseAdmin.from("rooms").select("current_phase").eq("code", roomCode).single();
-  assertTransition(room?.current_phase || "WORD", "VOTE");
+  let phase = room?.current_phase || "WORD";
+
+  // Cas rencontré sur certains deuxièmes tours : la phase peut rester à DRAW
+  // (par exemple si l'écran REVEAL n'a pas eu le temps de pousser l'état).
+  // On force alors le passage à REVEAL avant de continuer, ce qui évite l'erreur
+  // de transition DRAW → VOTE tout en gardant le flux prévu.
+  if (phase === "DRAW") {
+    const { error: promoteError } = await supabaseAdmin
+      .from("rooms")
+      .update({ current_phase: "REVEAL" })
+      .eq("code", roomCode);
+    if (!promoteError) {
+      phase = "REVEAL";
+    }
+  }
+
+  assertTransition(phase, "VOTE");
 
   // Pour un revote, on purge les votes existants du dernier round afin d'éviter un passage immédiat en RESULTS.
   const { data: round } = await supabaseAdmin

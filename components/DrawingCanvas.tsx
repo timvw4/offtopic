@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import Image from "next/image";
 
 type Stroke =
   | { kind: "stroke"; color: string; size: number; points: { x: number; y: number }[] }
@@ -84,7 +85,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   }
 
   // Remplit une zone contiguë (style pot de peinture)
-  function applyFill(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  const applyFill = useCallback((ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {
     const { width, height } = ctx.canvas;
     const data = ctx.getImageData(0, 0, width, height);
     const target = (y | 0) * width + (x | 0);
@@ -130,7 +131,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
       }
     }
     ctx.putImageData(data, 0, 0);
-  }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -153,7 +154,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
         applyFill(ctx, Math.round(stroke.x), Math.round(stroke.y), stroke.color);
       }
     }
-  }, [strokes]);
+  }, [strokes, applyFill]);
 
   // Calcule la position exacte sur le canvas en tenant compte du ratio
   // entre la taille CSS (rect) et la taille réelle du canvas (width/height).
@@ -334,7 +335,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
           }}
           title="Pot de peinture (remplir une zone)"
         >
-          <img
+          <Image
             src="/bucket.png"
             alt=""
             aria-hidden="true"

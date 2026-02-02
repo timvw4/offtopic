@@ -388,7 +388,7 @@ export default function LobbyPage() {
                       {showDictTooltip && (
                         <div className="tooltip-content">
                           Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
-                          Son prochain vote compte double. S'il est de nouveau majoritaire plus tard, il est éliminé.
+                          Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
                         </div>
                       )}
                     </span>
@@ -398,7 +398,7 @@ export default function LobbyPage() {
                   </small>
                 </div>
               </label>
-              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D'autres rôles seront ajoutés plus tard.</p>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
             </div>
           )}
           {(selectedCam || selectedDict) && (
@@ -493,7 +493,7 @@ export default function LobbyPage() {
             </div>
           </div>
           <small style={{ color: "var(--muted)" }}>
-            Les changements de l'hôte sont reçus en direct : pas besoin d'actualiser.
+            Les changements de l&apos;hôte sont reçus en direct : pas besoin d&apos;actualiser.
           </small>
         </div>
       )}
@@ -524,7 +524,7 @@ export default function LobbyPage() {
           Démarrer
         </button>
       ) : (
-        <p>En attente de l'hôte pour lancer la partie.</p>
+        <p>En attente de l&apos;hôte pour lancer la partie.</p>
       )}
     </div>
   );

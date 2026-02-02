@@ -94,6 +94,12 @@ export default function DrawPage() {
       setInitialRemaining(Math.max(0, timer - elapsed));
     };
     updateInitialRemaining();
+
+    // Première valeur visuelle : on ajoute +1 s'il ne reste que 1-2s à cause du réseau pour afficher "3"
+    const initialDiff = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+    const visualInitial = initialDiff > 0 && initialDiff < 3 ? initialDiff + 1 : initialDiff;
+    setCountdown(visualInitial);
+
     const tick = () => {
       const diffMs = target - Date.now();
       const diff = Math.max(0, Math.ceil(diffMs / 1000));
@@ -103,9 +109,13 @@ export default function DrawPage() {
         updateInitialRemaining();
       }
     };
-    tick();
+
+    const first = setTimeout(tick, 150); // laisse le "3" visible immédiatement
     const id = setInterval(tick, 200);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, [drawStartsAt, isEliminated, nickname, params.roomCode, router, timer]);
 
   return (
@@ -113,9 +123,49 @@ export default function DrawPage() {
       <h2>Dessine ton mot</h2>
 
       {countdown !== null && countdown > 0 && (
-        <div className="card" style={{ textAlign: "center", fontSize: 24, fontWeight: 700 }}>
-          Début dans {countdown}s
-        </div>
+        <>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.65)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 50,
+              pointerEvents: "none",
+            }}
+          >
+            <span
+              key={countdown}
+              style={{
+                fontSize: 64,
+                fontWeight: 900,
+                color: "#facc15",
+                textShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                animation: "pop-count 0.8s ease",
+              }}
+            >
+              {countdown}
+            </span>
+          </div>
+          <style jsx>{`
+            @keyframes pop-count {
+              0% {
+                transform: scale(0.5);
+                opacity: 0;
+              }
+              50% {
+                transform: scale(1.1);
+                opacity: 1;
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+          `}</style>
+        </>
       )}
 
       {!isEliminated && (

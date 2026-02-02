@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
-import Link from "next/link";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
 import { PlayerList } from "@/components/PlayerList";
@@ -48,19 +47,19 @@ export default function LobbyPage() {
   const [settings, setSettings] = useState<RoomSettings>({
     hors_theme_count: 1,
     has_cameleon: false,
-  has_dictator: false,
+    has_dictator: false,
     drawing_timer_seconds: 60,
     word_theme: "general",
   });
   const [showCamTooltip, setShowCamTooltip] = useState(false);
   const [showDictTooltip, setShowDictTooltip] = useState(false);
-const [showRolesList, setShowRolesList] = useState(false);
+  const [showRolesList, setShowRolesList] = useState(false);
 
   const playerCount = players.length;
-  const { options, camAllowed } = allowedSettings(playerCount);
+  const { options } = allowedSettings(playerCount);
   const selectedHt = options.includes(settings.hors_theme_count) ? settings.hors_theme_count : options[0];
-const selectedCam = settings.has_cameleon ?? false;
-const selectedDict = settings.has_dictator ?? false;
+  const selectedCam = settings.has_cameleon ?? false;
+  const selectedDict = settings.has_dictator ?? false;
   const selectedTheme = settings.word_theme || "general";
 
   const themes = [
@@ -72,6 +71,8 @@ const selectedDict = settings.has_dictator ?? false;
     { value: "sport", label: "Sport" },
     { value: "technologie", label: "Technologie" },
   ];
+
+  const themeLabel = themes.find((t) => t.value === selectedTheme)?.label ?? "Général";
 
   const isHost = useMemo(() => settings.host_nickname === nickname, [settings.host_nickname, nickname]);
 
@@ -91,6 +92,7 @@ const selectedDict = settings.has_dictator ?? false;
 
       let hostNickname = roomRow?.host_nickname;
       if (!roomRow) {
+        // La room n'existe pas, on la crée et on désigne l'utilisateur courant comme hôte.
         hostNickname = nickname;
         await supabaseClient
           .from("rooms")
@@ -104,6 +106,10 @@ const selectedDict = settings.has_dictator ?? false;
             word_theme: "general",
           })
           .select();
+      } else if (!hostNickname) {
+        // La room existe mais aucun hôte n'est défini : on assigne l'utilisateur courant.
+        hostNickname = nickname;
+        await supabaseClient.from("rooms").update({ host_nickname: hostNickname }).eq("code", room);
       }
 
       setSettings({
@@ -382,7 +388,7 @@ const selectedDict = settings.has_dictator ?? false;
                       {showDictTooltip && (
                         <div className="tooltip-content">
                           Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
-                          Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
+                          Son prochain vote compte double. S'il est de nouveau majoritaire plus tard, il est éliminé.
                         </div>
                       )}
                     </span>
@@ -392,7 +398,7 @@ const selectedDict = settings.has_dictator ?? false;
                   </small>
                 </div>
               </label>
-              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D'autres rôles seront ajoutés plus tard.</p>
             </div>
           )}
           {(selectedCam || selectedDict) && (
@@ -448,33 +454,77 @@ const selectedDict = settings.has_dictator ?? false;
         </div>
       )}
 
+      {!isHost && (
+        <div className="card" style={{ display: "grid", gap: 10 }}>
+          <h4>Paramètres de la partie</h4>
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Lecture seule : seuls les hôtes peuvent modifier ces valeurs.
+          </p>
+          <div style={{ display: "grid", gap: 8 }}>
+            <div>
+              <strong>Thème :</strong> {themeLabel}
+            </div>
+            <div>
+              <strong>Hors-Thème :</strong> {selectedHt} joueur(s)
+            </div>
+            <div>
+              <strong>Rôles activés :</strong>{" "}
+              {selectedCam || selectedDict ? (
+                <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
+                  {selectedCam && (
+                    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <Image src="/roles/chameleon.png" alt="Caméléon" width={24} height={24} />
+                      Caméléon
+                    </span>
+                  )}
+                  {selectedDict && (
+                    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <Image src="/roles/dictator.png" alt="Dictateur" width={24} height={24} />
+                      Dictateur
+                    </span>
+                  )}
+                </span>
+              ) : (
+                "Aucun rôle spécial"
+              )}
+            </div>
+            <div>
+              <strong>Durée du dessin :</strong> {settings.drawing_timer_seconds ?? 60} secondes
+            </div>
+          </div>
+          <small style={{ color: "var(--muted)" }}>
+            Les changements de l'hôte sont reçus en direct : pas besoin d'actualiser.
+          </small>
+        </div>
+      )}
+
       {isHost ? (
-      <button
-        className="btn"
+        <button
+          className="btn"
           disabled={startDisabled}
           style={{ opacity: startDisabled ? 0.5 : 1 }}
-        onClick={async () => {
-          const resp = await fetch("/api/game/start", {
-            method: "POST",
-            body: JSON.stringify({
-              roomCode: params.roomCode,
-              settings: {
-                hors_theme_count: selectedHt,
-                has_cameleon: selectedCam,
-                has_dictator: selectedDict,
-                word_theme: selectedTheme,
-                drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
-              },
-            }),
-          });
-          if (!resp.ok) return;
-          router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
-        }}
-      >
+          onClick={async () => {
+            const resp = await fetch("/api/game/start", {
+              method: "POST",
+              body: JSON.stringify({
+                roomCode: params.roomCode,
+                settings: {
+                  hors_theme_count: selectedHt,
+                  has_cameleon: selectedCam,
+                  has_dictator: selectedDict,
+                  word_theme: selectedTheme,
+                  drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
+                },
+              }),
+            });
+            if (!resp.ok) return;
+            router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
+          }}
+        >
           Démarrer
-      </button>
+        </button>
       ) : (
-        <p>En attente de l&apos;hôte pour lancer la partie.</p>
+        <p>En attente de l'hôte pour lancer la partie.</p>
       )}
     </div>
   );

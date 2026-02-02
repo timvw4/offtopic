@@ -290,27 +290,10 @@ export default function RevealPage() {
                     style={{ objectFit: "cover" }}
                     priority={false}
                   />
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "flex-end",
-                      justifyContent: "center",
-                      padding: 10,
-                      background: "linear-gradient(transparent 55%, rgba(0,0,0,0.65))",
-                      color: "#ffffff",
-                      fontWeight: 700,
-                      letterSpacing: 0.2,
-                      textShadow: "0 2px 6px rgba(0,0,0,0.5)",
-                    }}
-                  >
-                    {d.nickname}
-                  </div>
                 </div>
               </div>
             </div>
-            <strong style={{ textAlign: "center" }}>{d.nickname}</strong>
+              <strong style={{ textAlign: "center", color: "#ffffff" }}>{d.nickname}</strong>
           </div>
         ))}
       </div>

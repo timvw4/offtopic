@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
@@ -40,6 +40,8 @@ export default function WordRevealPage() {
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [pendingReady, setPendingReady] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const wordSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Charge données et subscriptions
   useEffect(() => {
@@ -128,6 +130,9 @@ export default function WordRevealPage() {
             }
           });
       }, 500);
+
+      // Les données initiales sont chargées (round + rôle)
+      setDataLoaded(true);
     }
 
     void init();
@@ -137,6 +142,20 @@ export default function WordRevealPage() {
       if (pollRound) clearInterval(pollRound);
     };
   }, [nickname, params.roomCode]);
+
+  // Dès l'arrivée sur la page, on se place directement sur la section "Mot secret"
+  useEffect(() => {
+    const id = setTimeout(() => {
+      wordSectionRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
+    }, 0); // laisse le temps au layout de se peindre
+    return () => clearTimeout(id);
+  }, []);
+
+  // Si le contenu se charge plus tard (rôle/mot), on recentre encore
+  useEffect(() => {
+    if (!dataLoaded) return;
+    wordSectionRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
+  }, [dataLoaded]);
 
   // Tous prêts ? On ne compte que les joueurs non éliminés.
   const allReady = useMemo(() => {
@@ -175,17 +194,20 @@ export default function WordRevealPage() {
     }
   }, [drawStartsAt, isEliminated, nickname, params.roomCode, router, timerSeconds]);
 
-  const displayedWord = role === "HORS_THEME" ? wordHorsTheme : wordCivil;
-  const roleLabel =
-    role === "HORS_THEME"
+  // Ne montre pas le mot tant que le round + rôle ne sont pas chargés
+  const displayedWord = dataLoaded ? (role === "HORS_THEME" ? wordHorsTheme : wordCivil) : "...";
+  const roleLabel = !dataLoaded
+    ? "..."
+    : role === "HORS_THEME"
       ? "Hors-Thème"
       : role === "CAMELEON"
         ? "Caméléon"
         : role === "DICTATOR"
           ? "Dictateur"
           : "Civil";
-  const roleDescription =
-    role === "HORS_THEME"
+  const roleDescription = !dataLoaded
+    ? "Chargement..."
+    : role === "HORS_THEME"
       ? "Tu as un mot légèrement différent des civils. Ne te fais pas démasqué par les autres joueurs pour gagner."
       : role === "CAMELEON"
         ? "Tu as le même mot que les civils et tu dois te faire passer pour un hors-thème et te faire éliminé pour gagner. attention tu ne dois pas te faire repérer par les autres joueurs."
@@ -193,19 +215,19 @@ export default function WordRevealPage() {
           ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
           : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème.";
   const roleMedia =
-    role === "CAMELEON"
+    dataLoaded && role === "CAMELEON"
       ? { src: asset("/roles/chameleon.png"), alt: "Caméléon" }
-      : role === "DICTATOR"
+      : dataLoaded && role === "DICTATOR"
         ? { src: asset("/roles/dictator.png"), alt: "Dictateur" }
-        : role === "HORS_THEME"
-          ? { src: asset("/hors-theme.png"), alt: "Hors-Thème" }
-          : role === "CIVIL"
-            ? { src: asset("/civil.png"), alt: "Civil" }
+        : dataLoaded && role === "HORS_THEME"
+          ? { src: asset("/roles/hors-theme.png"), alt: "Hors-Thème" }
+          : dataLoaded && role === "CIVIL"
+            ? { src: asset("/roles/civil.png"), alt: "Civil" }
             : null;
-  const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 140 : 96;
+  const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 190 : 190;
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div ref={wordSectionRef} style={{ display: "grid", gap: 16 }}>
       <h2>Mot secret</h2>
       <WordCard word={displayedWord} />
       <div
@@ -218,10 +240,14 @@ export default function WordRevealPage() {
             alt={roleMedia.alt}
             width={roleImageSize}
             height={roleImageSize}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))" }}
+            style={{
+              objectFit: "contain",
+              filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))",
+              marginTop: -30,
+            }}
           />
         )}
-        <strong style={{ marginTop: -4 }}>Ton rôle : {roleLabel}</strong>
+        <strong style={{ marginTop: -30, marginBottom: 10 }}>{roleLabel}</strong>
         <p style={{ margin: 0 }}>{roleDescription}</p>
       </div>
 

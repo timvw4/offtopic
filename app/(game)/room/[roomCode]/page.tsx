@@ -62,10 +62,12 @@ export default function LobbyPage() {
 
   const playerCount = players.length;
   const { options } = allowedSettings(playerCount);
+  const hasSingleHtOption = options.length === 1;
   const selectedHt = options.includes(settings.hors_theme_count) ? settings.hors_theme_count : options[0];
   const selectedCam = settings.has_cameleon ?? false;
   const selectedDict = settings.has_dictator ?? false;
   const selectedTheme = settings.word_theme || "general";
+  const htDisplay = selectedHt === 1 ? "1 Hors-Thème" : `${selectedHt} Hors-Thèmes`;
 
   const themes = [
     { value: "general", label: "Général" },
@@ -383,17 +385,32 @@ export default function LobbyPage() {
           </label>
           <label style={{ display: "grid", gap: 6 }}>
             Hors-Thème
-            <select
-              className="input"
-              value={selectedHt}
-              onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedTheme)}
-            >
-              {options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt} Hors-Thème
-                </option>
-              ))}
-            </select>
+            {hasSingleHtOption ? (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.16)",
+                  background: "rgba(255,255,255,0.04)",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.72)",
+                }}
+              >
+                {htDisplay}
+              </div>
+            ) : (
+              <select
+                className="input"
+                value={selectedHt}
+                onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedTheme)}
+              >
+                {options.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt} Hors-Thème
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
           <button
             type="button"
@@ -585,7 +602,8 @@ export default function LobbyPage() {
               <strong>Thème :</strong> {themeLabel}
             </div>
             <div>
-              <strong>Hors-Thème :</strong> {selectedHt} joueur(s)
+              <strong>Hors-Thème :</strong>{" "}
+              <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>{htDisplay}</span>
             </div>
             <div>
               <strong>Rôles activés :</strong>{" "}

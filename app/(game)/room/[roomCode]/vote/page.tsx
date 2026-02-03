@@ -132,15 +132,25 @@ export default function VotePage() {
     };
   }, [nickname, params.roomCode, roundId]);
 
-  const eligiblePlayers =
-    tieIds.length > 0 ? players.filter((p) => tieIds.includes(p.id)) : players;
+  // Joueurs affichés dans le panneau de vote (cibles) : uniquement les éligibles au vote actuel
+  const eligiblePlayers = tieIds.length > 0 ? players.filter((p) => tieIds.includes(p.id)) : players;
   const voteTargets = eligiblePlayers.filter((p) => p.id !== selfId && !p.isEliminated);
+  // Joueurs affichés dans le statut : tous les votants (vivants), pour suivre qui a voté même en revote
+  const voteStatusPlayers = players.filter((p) => !p.isEliminated);
   const canShowAccusation = hasCameleon && !isCameleonSelf;
   const accusationEnabled = canShowAccusation && accusationAvailable;
   const hasVoted = useMemo(
     () => votes.some((v) => v.voter_nickname === nickname && (!roundId || v.round_id === roundId)),
     [nickname, roundId, votes],
   );
+  const hasVotedOrSubmitted = hasVoted || voteSubmitted;
+
+  // Si on recharge après avoir déjà voté, on cache aussi le panneau et on affiche le message.
+  useEffect(() => {
+    if (hasVoted && !voteSubmitted) {
+      setVoteSubmitted(true);
+    }
+  }, [hasVoted, voteSubmitted]);
 
   useEffect(() => {
     if (isEliminated) {
@@ -159,7 +169,7 @@ export default function VotePage() {
       <div className="card" style={{ display: "grid", gap: 10 }}>
         <h4>Statut des votes</h4>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
-          {eligiblePlayers.map((p) => {
+          {voteStatusPlayers.map((p) => {
             const voted = votes.some((v) => v.voter_nickname === p.nickname && (!roundId || v.round_id === roundId));
             return (
               <li
@@ -174,39 +184,54 @@ export default function VotePage() {
                 }}
               >
                 <span style={{ fontWeight: 600 }}>{p.nickname}</span>
-                <span>{voted ? "✉️" : "..."}</span>
+                <span>
+                  {voted ? (
+                    <span
+                      aria-label="Vote reçu"
+                      title="Vote reçu"
+                      style={{ color: "#22c55e", fontWeight: 700, fontSize: 16, lineHeight: 1 }}
+                    >
+                      ✓
+                    </span>
+                  ) : (
+                    "..."
+                  )}
+                </span>
               </li>
             );
           })}
         </ul>
-        {voteSubmitted && <p style={{ margin: 0 }}>Vote enregistré. En attente des autres joueurs…</p>}
+        {voteSubmitted && <p style={{ margin: 0 }}>Vote enregistré.</p>}
       </div>
-      {!isEliminated && (
-      <VotePanel
-        players={voteTargets}
-        accusationAvailable={accusationEnabled}
-        showAccusation={canShowAccusation}
-        disableAccusation={choiceLocked === "vote"}
-        disableVote={choiceLocked === "accuse" || voteSubmitted}
-        hideVoteButton={voteSubmitted}
-        onVote={async (playerId) => {
-          setChoiceLocked("vote");
-          await fetch("/api/vote", {
-            method: "POST",
-            body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
-          });
-          setVoteSubmitted(true);
-        }}
-        onAccuseChameleon={async (playerId) => {
-          setChoiceLocked("accuse");
-          await fetch("/api/accuse", {
-            method: "POST",
-            body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
-          });
-          setAccusationAvailable(false);
-        }}
-      />
-      )}
+      {!isEliminated &&
+        (hasVotedOrSubmitted ? (
+          <p style={{ margin: 0 }}>En attente des votes des autres joueurs...</p>
+        ) : (
+          <VotePanel
+            players={voteTargets}
+            accusationAvailable={accusationEnabled}
+            showAccusation={canShowAccusation}
+            disableAccusation={choiceLocked === "vote"}
+            disableVote={choiceLocked === "accuse" || voteSubmitted}
+            hideVoteButton={voteSubmitted}
+            onVote={async (playerId) => {
+              setChoiceLocked("vote");
+              await fetch("/api/vote", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
+              });
+              setVoteSubmitted(true);
+            }}
+            onAccuseChameleon={async (playerId) => {
+              setChoiceLocked("accuse");
+              await fetch("/api/accuse", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
+              });
+              setAccusationAvailable(false);
+            }}
+          />
+        ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
@@ -185,8 +186,17 @@ export default function ResultsPage() {
       .then(({ data }) => setVotes((data as VoteRow[]) || []));
   }, [roundId]);
 
-  // Attente de la phase RESULTS, ou WORD/DRAW si nouveau tour
+  // Attente de la phase RESULTS, ou WORD/DRAW si nouveau tour.
+  // Spectateurs (éliminés) restent sur cette page pour éviter les aller-retours.
+  const me = players.find((p) => p.nickname === nickname);
+  const isMeEliminated = !!me?.isEliminated;
+  const isHost = me?.isHost;
+
   useEffect(() => {
+    if (isMeEliminated) {
+      setLoading(false);
+      return;
+    }
     if (phase === "WORD") {
       router.replace(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
     }
@@ -264,11 +274,10 @@ export default function ResultsPage() {
     } else {
       setLoading(false);
     }
-  }, [phase, nickname, params.roomCode, router]);
+  }, [isMeEliminated, phase, nickname, params.roomCode, router, players]);
 
   const eliminated = players.find((p) => p.id === result?.eliminated_player_id);
-  const me = players.find((p) => p.nickname === nickname);
-  const isHost = me?.isHost;
+  const dictatorPlayer = players.find((p) => p.role === "DICTATOR");
 
   const voteCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -335,6 +344,17 @@ export default function ResultsPage() {
   }, [alivePlayers.length, eliminated?.role, horsThemeAlive, result?.is_chameleon]);
 
   const horsThemeMinoritaire = horsThemeAlive < alivePlayers.length / 2;
+  const gameEnded = outcome && outcome !== "La partie continue";
+  const winnersLabel =
+    outcome === "Civils gagnent (tous les Hors-Thème éliminés)"
+      ? "Civils"
+      : outcome === "Hors-Thème gagnent (≥50% des joueurs restants)"
+        ? "Hors-Thème"
+        : outcome === "Caméléon gagne (éliminé sans accusation correcte)"
+          ? "Caméléon"
+          : outcome === "Caméléon perd (accusation correcte)"
+            ? "Civils"
+            : null;
 
   async function goToLobbyAndMaybeReset() {
     const room = params.roomCode;
@@ -371,10 +391,13 @@ export default function ResultsPage() {
       <h2>Résultat du tour</h2>
       {loading && <p>Résolution des votes…</p>}
       {computedTieIds.length > 0 && (
-        <div className="card result-pop" style={{ display: "grid", gap: 8 }}>
-          <strong>Égalité détectée</strong>
-          <p>Revote uniquement entre :</p>
-          <ul style={{ paddingLeft: 16, margin: 0 }}>
+        <div
+          className="card result-pop"
+          style={{ display: "grid", gap: 10, justifyItems: "center", textAlign: "center" }}
+        >
+          <strong style={{ fontSize: 18 }}>Égalité détectée</strong>
+          <p style={{ margin: 0 }}>Revote entre :</p>
+          <ul style={{ paddingLeft: 0, margin: 0, display: "grid", gap: 4, listStyle: "none" }}>
             {players
               .filter((p) => computedTieIds.includes(p.id))
               .map((p) => (
@@ -382,45 +405,116 @@ export default function ResultsPage() {
               ))}
           </ul>
           {isHost ? (
-            <button
-              className="btn"
-              onClick={async () => {
-                await fetch("/api/phase/vote", {
-                  method: "POST",
-                  body: JSON.stringify({ roomCode: params.roomCode }),
-                });
-                setPhase("VOTE");
-              }}
-            >
-              Relancer un vote
-            </button>
+            <p style={{ margin: 0 }}></p>
           ) : (
-            <p>En attente de l&apos;hôte pour relancer le vote…</p>
+            <p style={{ margin: 0 }}>En attente de l&apos;hôte…</p>
           )}
         </div>
       )}
       {dictatorSurvived ? (
-        <div className="card result-pop" style={{ display: "grid", gap: 6 }}>
-          <strong>Le Dictateur a survécu</strong>
+        <div className="card result-pop" style={{ display: "grid", gap: 4, justifyItems: "center", textAlign: "center" }}>
+          <Image
+            src="/roles/dictator.png"
+            alt="Rôle Dictateur"
+            width={190}
+            height={190}
+            style={{ marginTop: -20, marginBottom: -30 }}
+          />
+          <div style={{ display: "grid", gap: 2 }}>
+            <strong style={{ fontSize: 18, lineHeight: 1.2, marginTop: 0 }}>
+              {dictatorPlayer?.nickname ?? "Le Dictateur"} est le Dictateur
+            </strong>
+            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, marginBottom: 20 }}>Immunité utilisée.</span>
+          </div>
           <p style={{ margin: 0 }}>Immunité utilisée. Son prochain vote comptera double.</p>
           <p style={{ margin: 0 }}>Aucun joueur n&apos;est éliminé ce tour.</p>
         </div>
       ) : eliminated ? (
-        <div className="card result-pop" style={{ display: "grid", gap: 6 }}>
-          <strong>{eliminated.nickname}</strong> est éliminé.
-          <p>Rôle révélé : {eliminated.role}</p>
-          {result?.is_chameleon === true && <p>Le Caméléon a été éliminé → victoire Caméléon.</p>}
-          {result?.is_chameleon === false && eliminated?.role === "CAMELEON" && (
-            <p>Caméléon identifié, il perd.</p>
-          )}
-          {outcome && <p>{outcome}</p>}
-        </div>
+        eliminated.role === "CIVIL" ? (
+          <div className="card result-pop" style={{ display: "grid", gap: 6, justifyItems: "center", textAlign: "center" }}>
+            <Image
+              src="/roles/civil.png"
+              alt="Rôle Civil"
+              width={190}
+              height={190}
+              style={{ marginTop: -20, marginBottom: -30 }}
+            />
+            <div style={{ display: "grid", gap: 4 }}>
+              <strong style={{ fontSize: 18, lineHeight: 1.2, marginTop: 0 }}>
+                {eliminated.nickname} était un Civil
+              </strong>
+              <span style={{ color: "rgba(255,255,255,0.78)", fontSize: 14 }}>Il est éliminé.</span>
+            </div>
+          </div>
+        ) : (
+          <div className="card result-pop" style={{ display: "grid", gap: 8, justifyItems: "center", textAlign: "center" }}>
+            <strong style={{ fontSize: 18 }}>{eliminated.nickname}</strong>
+            <p style={{ margin: 0 }}>Rôle révélé : {eliminated.role}</p>
+            {result?.is_chameleon === true && <p style={{ margin: 0 }}>Le Caméléon a été éliminé → victoire Caméléon.</p>}
+            {result?.is_chameleon === false && eliminated?.role === "CAMELEON" && (
+              <p style={{ margin: 0 }}>Caméléon identifié, il perd.</p>
+            )}
+            {outcome && <p style={{ margin: 0 }}>{outcome}</p>}
+          </div>
+        )
       ) : (
-        <p>Aucun joueur éliminé.</p>
+        <div className="card result-pop" style={{ textAlign: "center" }}>
+          <p style={{ margin: 0 }}>Aucun joueur éliminé.</p>
+        </div>
+      )}
+
+      {gameEnded && winnersLabel && (
+        <div
+          className="card result-pop"
+          style={{ display: "grid", gap: 10, justifyItems: "center", textAlign: "center", padding: "16px 12px" }}
+        >
+          <strong style={{ fontSize: 18, textTransform: "uppercase" }}>Partie terminée, les {winnersLabel} ont gagné</strong>
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+              width: "100%",
+            }}
+          >
+            {players.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "grid",
+                  gap: 6,
+                  justifyItems: "center",
+                  padding: 10,
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <Image
+                  src={
+                    p.role === "CAMELEON"
+                      ? "/roles/chameleon.png"
+                      : p.role === "DICTATOR"
+                        ? "/roles/dictator.png"
+                        : p.role === "HORS_THEME"
+                          ? "/roles/hors-theme.png"
+                          : "/roles/civil.png"
+                  }
+                  alt={`Rôle ${p.role}`}
+                  width={80}
+                  height={80}
+                  style={{ objectFit: "contain" }}
+                />
+                <span style={{ fontWeight: 700 }}>{p.nickname}</span>
+                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{p.role}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="card">
-        <h4>Votes</h4>
+        <h4 style={{ marginBottom: 10 }}>Votes</h4>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
           {players
             .filter((p) => !p.isEliminated || p.id === result?.eliminated_player_id)
@@ -465,59 +559,103 @@ export default function ResultsPage() {
         </ul>
       </div>
 
+      {computedTieIds.length > 0 && isHost && (
+        <div style={{ display: "grid", gap: 8 }}>
+          <button
+            className="btn"
+            onClick={async () => {
+              await fetch("/api/phase/vote", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode }),
+              });
+              setPhase("VOTE");
+            }}
+          >
+            Relancer un vote
+          </button>
+          <button
+            className="btn"
+            onClick={async () => {
+              const resp = await fetch("/api/game/next", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode }),
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                const t = data?.timerSeconds ?? 60;
+                setPhase("DRAW");
+                router.replace(`/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`);
+              }
+            }}
+          >
+            Prochain tour
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {/* Pas de retour lobby tant que l'égalité n'est pas résolue */}
-        {!hasTie && (
+        {/* Bouton lobby uniquement si la partie est terminée et pas d'égalité */}
+        {!hasTie && gameEnded && (
           <button className="btn" onClick={goToLobbyAndMaybeReset}>
             Retour au lobby
           </button>
         )}
 
-        {dictatorSurvived ? (
-          isHost ? (
-            <button
-              className="btn"
-              onClick={async () => {
-                const resp = await fetch("/api/game/next", {
-                  method: "POST",
-                  body: JSON.stringify({ roomCode: params.roomCode }),
-                });
-                if (resp.ok) {
-                  const data = await resp.json();
-                  const t = data?.timerSeconds ?? 60;
-                  setPhase("DRAW");
-                  router.replace(
-                    `/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`,
-                  );
-                }
-              }}
-            >
-              Prochain tour
-            </button>
-          ) : null
-        ) : hostCanStartNewRound ? (
-          isHost ? (
-            <button
-              className="btn"
-              onClick={async () => {
-                const resp = await fetch("/api/game/next", {
-                  method: "POST",
-                  body: JSON.stringify({ roomCode: params.roomCode }),
-                });
-                if (resp.ok) {
-                  const data = await resp.json();
-                  const t = data?.timerSeconds ?? 60;
-                  setPhase("DRAW");
-                  router.replace(
-                    `/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`,
-                  );
-                }
-              }}
-            >
-              Prochain tour
-            </button>
-          ) : null
-        ) : null}
+        {!hasTie &&
+          !gameEnded &&
+          (dictatorSurvived
+            ? isHost
+              ? (
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    const resp = await fetch("/api/game/next", {
+                      method: "POST",
+                      body: JSON.stringify({ roomCode: params.roomCode }),
+                    });
+                    if (resp.ok) {
+                      const data = await resp.json();
+                      const t = data?.timerSeconds ?? 60;
+                      setPhase("DRAW");
+                      router.replace(
+                        `/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`,
+                      );
+                    }
+                  }}
+                >
+                  Prochain tour
+                </button>
+                )
+              : (
+                <p style={{ margin: 0 }}>En attente de l&apos;hôte pour passer au prochain tour…</p>
+              )
+            : hostCanStartNewRound
+              ? (
+                isHost ? (
+                  <button
+                    className="btn"
+                    onClick={async () => {
+                      const resp = await fetch("/api/game/next", {
+                        method: "POST",
+                        body: JSON.stringify({ roomCode: params.roomCode }),
+                      });
+                      if (resp.ok) {
+                        const data = await resp.json();
+                        const t = data?.timerSeconds ?? 60;
+                        setPhase("DRAW");
+                        router.replace(
+                          `/room/${params.roomCode}/draw?nickname=${encodeURIComponent(nickname)}&timer=${t}`,
+                        );
+                      }
+                    }}
+                  >
+                    Prochain tour
+                  </button>
+                ) : (
+                  <p style={{ margin: 0 }}>En attente de l&apos;hôte pour passer au prochain tour…</p>
+                )
+              )
+              : null)}
       </div>
     </div>
   );

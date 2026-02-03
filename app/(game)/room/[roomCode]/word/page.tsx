@@ -25,6 +25,34 @@ function mapPlayer(row: any): Player {
   };
 }
 
+function sortPlayers(list: Player[]) {
+  return [...list].sort((a, b) => a.nickname.localeCompare(b.nickname));
+}
+
+// Conserve un ordre stable : on garde l'ordre précédent, on met à jour les données,
+// et on ajoute les nouveaux joueurs à la fin (triés pour rester déterministes).
+function mergePlayers(prev: Player[], incoming: Player[]) {
+  const incomingMap = new Map(incoming.map((p) => [p.id, p]));
+  const ordered: Player[] = [];
+
+  // On conserve l'ordre existant pour les joueurs déjà connus
+  for (const p of prev) {
+    const fresh = incomingMap.get(p.id);
+    if (fresh) {
+      ordered.push(fresh);
+      incomingMap.delete(p.id);
+    }
+  }
+
+  // On ajoute les nouveaux joueurs (si arrivés pendant la partie), triés pour rester prévisible
+  const remaining = sortPlayers([...incomingMap.values()]);
+  return ordered.concat(remaining);
+}
+
+function mapPlayers(rows: any[]) {
+  return (rows || []).map(mapPlayer);
+}
+
 export default function WordRevealPage() {
   const router = useRouter();
   const params = useParams<{ roomCode: string }>();
@@ -76,11 +104,8 @@ export default function WordRevealPage() {
       setRole(myRole?.role || "CIVIL");
       setIsEliminated(!!myRole?.is_eliminated);
 
-      // Reset ready pour ce tour (pour soi)
-      await supabaseClient.from("players").update({ is_ready: false }).eq("room_code", room).eq("nickname", nickname);
-
       const { data: pData } = await supabaseClient.from("players").select("*").eq("room_code", room);
-      setPlayers((pData || []).map(mapPlayer));
+      setPlayers((prev) => mergePlayers(prev, mapPlayers(pData || [])));
 
       channel = supabaseClient
         .channel(`word:${room}`)
@@ -92,7 +117,7 @@ export default function WordRevealPage() {
               .from("players")
               .select("*")
               .eq("room_code", room)
-              .then(({ data }) => setPlayers((data || []).map(mapPlayer)));
+              .then(({ data }) => setPlayers((prev) => mergePlayers(prev, mapPlayers(data || []))));
           },
         )
         .on(
@@ -111,7 +136,7 @@ export default function WordRevealPage() {
           .from("players")
           .select("*")
           .eq("room_code", room)
-          .then(({ data }) => setPlayers((data || []).map(mapPlayer)));
+          .then(({ data }) => setPlayers((prev) => mergePlayers(prev, mapPlayers(data || []))));
       }, 500);
 
       // Polling de secours (rapide) pour récupérer draw_starts_at si l'event rounds ne passe pas
@@ -275,26 +300,33 @@ export default function WordRevealPage() {
         </ul>
       </div>
 
-      <button
-        className="btn btn-compact"
-        disabled={me?.isReady || pendingReady}
-        style={{ opacity: me?.isReady || pendingReady ? 0.5 : 1 }}
-        onClick={async () => {
-          setPendingReady(true);
-          // Optimiste : on marque prêt localement pour désactiver le bouton tout de suite
-          setPlayers((prev) => prev.map((p) => (p.nickname === nickname ? { ...p, isReady: true } : p)));
-          await supabaseClient
-            .from("players")
-            .update({ is_ready: true })
-            .eq("room_code", params.roomCode)
-            .eq("nickname", nickname);
+      {me?.isReady || pendingReady ? (
+        <p style={{ margin: 0, textAlign: "left", color: "rgba(255,255,255,0.8)" }}>En attente des autres joueurs…</p>
+      ) : (
+        <button
+          className="btn btn-compact"
+          onClick={async () => {
+            setPendingReady(true);
+            // Optimiste : on marque prêt localement pour désactiver le bouton tout de suite (ordre conservé)
+            setPlayers((prev) =>
+              mergePlayers(
+                prev,
+                prev.map((p) => (p.nickname === nickname ? { ...p, isReady: true } : p)),
+              ),
+            );
+            await supabaseClient
+              .from("players")
+              .update({ is_ready: true })
+              .eq("room_code", params.roomCode)
+              .eq("nickname", nickname);
           // Rafraîchit la liste au cas où l'événement Realtime tarderait
           const { data } = await supabaseClient.from("players").select("*").eq("room_code", params.roomCode);
-          setPlayers((data || []).map(mapPlayer));
-        }}
-      >
-        Prêt
-      </button>
+          setPlayers((prev) => mergePlayers(prev, mapPlayers(data || [])));
+          }}
+        >
+          Prêt
+        </button>
+      )}
       {drawStartsAt && <p>Départ imminent…</p>}
     </div>
   );

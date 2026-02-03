@@ -3,7 +3,7 @@
 import "./globals.css";
 import { ReactNode, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { AmbientAudio } from "@/components/AmbientAudio";
+import { AmbientAudioProvider } from "@/components/AmbientAudio";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -45,8 +45,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body>
-        <main className="app-shell">{children}</main>
-        <AmbientAudio placement={isHome ? "top" : "bottom"} />
+        <AmbientAudioProvider showFloatingButton={isHome} placement={isHome ? "top" : "bottom"}>
+          <main className="app-shell">{children}</main>
+        </AmbientAudioProvider>
       </body>
     </html>
   );

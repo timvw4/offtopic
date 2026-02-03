@@ -233,13 +233,13 @@ export default function RevealPage() {
           .map((d) => (
           <div
             key={d.id}
-            className="card"
             style={{
               display: "grid",
               gap: 8,
+              padding: 8,
               background: "transparent",
-              color: "#0b0f1a",
-              border: "2px solid rgba(11,15,26,0.08)",
+              color: "#e5e7eb",
+              borderRadius: 12,
             }}
           >
             <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", perspective: "1200px" }}>

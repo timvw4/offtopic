@@ -120,7 +120,7 @@ export default function DrawPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <h2>Dessine ton mot</h2>
+      <h2>Dessine</h2>
 
       {countdown !== null && countdown > 0 && (
         <>

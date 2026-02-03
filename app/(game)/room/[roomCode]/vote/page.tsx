@@ -8,7 +8,14 @@ import { VotePanel } from "@/components/VotePanel";
 
 type VoteRow = { voter_nickname: string; target_player_id: string; round_id: string };
 type AccuseRow = { accuser_nickname: string; target_player_id: string };
-type ChoiceLock = "vote" | "accuse" | "none";
+
+// Centralise les valeurs possibles pour éviter tout écart de type
+const CHOICE_LOCK = {
+  VOTE: "vote",
+  ACCUSE: "accuse",
+  NONE: "none",
+} as const;
+type ChoiceLock = (typeof CHOICE_LOCK)[keyof typeof CHOICE_LOCK];
 
 function mapPlayerRow(row: any): Player {
   return {
@@ -39,7 +46,7 @@ export default function VotePage() {
   const [voteSubmitted, setVoteSubmitted] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
   const [isCameleonSelf, setIsCameleonSelf] = useState(false);
-  const [choiceLocked, setChoiceLocked] = useState<ChoiceLock>("none");
+  const [choiceLocked, setChoiceLocked] = useState<ChoiceLock>(CHOICE_LOCK.NONE);
   const [accusations, setAccusations] = useState<AccuseRow[]>([]);
   const [resolving, setResolving] = useState(false);
 
@@ -164,6 +171,8 @@ export default function VotePage() {
     [nickname, roundId, votes],
   );
   const hasVotedOrSubmitted = hasVoted || voteSubmitted;
+  const isAccuseLocked = choiceLocked === CHOICE_LOCK.ACCUSE;
+  const isVoteLocked = choiceLocked === CHOICE_LOCK.VOTE;
 
   // Si on recharge après avoir déjà voté, on cache aussi le panneau et on affiche le message.
   useEffect(() => {
@@ -191,7 +200,7 @@ export default function VotePage() {
     const allActed = alive.every((p) => {
       const voted = votes.some((v) => v.voter_nickname === p.nickname && (!roundId || v.round_id === roundId));
       const accused = accusations.some((a) => a.accuser_nickname === p.nickname);
-      return voted || accused || (p.nickname === nickname && choiceLocked === "accuse");
+      return voted || accused || (p.nickname === nickname && isAccuseLocked);
     });
     const me = players.find((p) => p.nickname === nickname);
     if (!allActed || !me?.isHost) return;
@@ -248,7 +257,7 @@ export default function VotePage() {
         {voteSubmitted && <p style={{ margin: 0 }}>Vote enregistré.</p>}
       </div>
       {!isEliminated &&
-        (choiceLocked === "accuse" ? (
+        (isAccuseLocked ? (
           <p style={{ margin: 0 }}>Accusation envoyée. En attente des autres joueurs...</p>
         ) : hasVotedOrSubmitted ? (
           <p style={{ margin: 0 }}>En attente des votes des autres joueurs...</p>
@@ -257,11 +266,11 @@ export default function VotePage() {
             players={voteTargets}
             accusationAvailable={accusationEnabled}
             showAccusation={canShowAccusation}
-            disableAccusation={choiceLocked === "vote"}
-            disableVote={choiceLocked === "accuse" || voteSubmitted}
+            disableAccusation={isVoteLocked}
+            disableVote={isAccuseLocked || voteSubmitted}
             hideVoteButton={voteSubmitted}
             onVote={async (playerId) => {
-              setChoiceLocked("vote");
+              setChoiceLocked(CHOICE_LOCK.VOTE);
               await fetch("/api/vote", {
                 method: "POST",
                 body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
@@ -269,7 +278,7 @@ export default function VotePage() {
               setVoteSubmitted(true);
             }}
             onAccuseChameleon={async (playerId) => {
-              setChoiceLocked("accuse");
+              setChoiceLocked(CHOICE_LOCK.ACCUSE);
               await fetch("/api/accuse", {
                 method: "POST",
                 body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),

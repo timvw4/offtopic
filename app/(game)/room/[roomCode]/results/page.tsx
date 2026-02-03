@@ -610,7 +610,7 @@ export default function ResultsPage() {
                           onBlur={hideTooltip}
                           tabIndex={0}
                         >
-                          <img
+                          <Image
                             src="/chamchar.png"
                             alt="Accusation Caméléon"
                             title={accusers[i] ? `Accusation par ${accusers[i]}` : "Accusation Caméléon"}

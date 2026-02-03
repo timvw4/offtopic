@@ -250,6 +250,13 @@ export default function WordRevealPage() {
             ? { src: asset("/roles/civil.png"), alt: "Civil" }
             : null;
   const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 190 : 190;
+  const roleImageStyle = {
+    objectFit: "contain",
+    filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))",
+    marginTop: -30,
+    marginBottom: role === "CIVIL" ? -7 : 0, // décale le titre vers le bas pour Civil
+  } as const;
+  const roleLabelMarginTop = role === "CIVIL" ? 0 : -30;
 
   return (
     <div ref={wordSectionRef} style={{ display: "grid", gap: 16 }}>
@@ -265,14 +272,10 @@ export default function WordRevealPage() {
             alt={roleMedia.alt}
             width={roleImageSize}
             height={roleImageSize}
-            style={{
-              objectFit: "contain",
-              filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))",
-              marginTop: -30,
-            }}
+            style={roleImageStyle}
           />
         )}
-        <strong style={{ marginTop: -30, marginBottom: 10 }}>{roleLabel}</strong>
+        <strong style={{ marginTop: roleLabelMarginTop, marginBottom: 10 }}>{roleLabel}</strong>
         <p style={{ margin: 0 }}>{roleDescription}</p>
       </div>
 

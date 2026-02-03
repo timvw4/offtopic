@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AmbientAudioButton } from "@/components/AmbientAudio";
 
@@ -25,6 +25,25 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
 
   // État local pour contrôler l'ouverture du menu.
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Ferme le menu si on clique en dehors de son conteneur.
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent | TouchEvent) {
+      if (!menuRef.current) return;
+      const target = event.target;
+      if (target instanceof Node && menuRef.current.contains(target)) return;
+      setMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, []);
 
   async function handleLeave() {
     try {
@@ -52,7 +71,7 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Petit menu qui regroupe Quitter et un simple bouton On/Off. */}
-        <div style={{ position: "relative" }}>
+        <div ref={menuRef} style={{ position: "relative" }}>
           <button
             className="btn btn-compact btn-ghost"
             style={{

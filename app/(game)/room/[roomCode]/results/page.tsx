@@ -6,6 +6,9 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
 
+const ASSET_VERSION = "v2";
+const asset = (path: string) => `${path}?v=${ASSET_VERSION}`;
+
 function mapPlayerRow(row: any): Player {
   return {
     id: row.id,
@@ -50,7 +53,33 @@ export default function ResultsPage() {
   const [roundId, setRoundId] = useState<string | null>(null);
   const [tieIds, setTieIds] = useState<string[]>([]);
   const [accusations, setAccusations] = useState<ChameleonAccusationRow[]>([]);
+  const [visibleTooltipPlayerId, setVisibleTooltipPlayerId] = useState<string | null>(null);
+  const tooltipTimeout = useRef<NodeJS.Timeout | null>(null);
   const resolvedRef = useRef(false);
+
+  const clearTooltipTimeout = () => {
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+      tooltipTimeout.current = null;
+    }
+  };
+
+  const showTooltip = (playerId: string) => {
+    clearTooltipTimeout();
+    setVisibleTooltipPlayerId(playerId);
+  };
+
+  const flashTooltip = (playerId: string) => {
+    showTooltip(playerId);
+    tooltipTimeout.current = setTimeout(() => {
+      setVisibleTooltipPlayerId(null);
+    }, 1500);
+  };
+
+  const hideTooltip = () => {
+    clearTooltipTimeout();
+    setVisibleTooltipPlayerId(null);
+  };
 
   useEffect(() => {
     const room = params.roomCode;
@@ -174,6 +203,12 @@ export default function ResultsPage() {
       if (pollRound) clearInterval(pollRound);
     };
   }, [nickname, params.roomCode, roundId]);
+
+  useEffect(() => {
+    return () => {
+      clearTooltipTimeout();
+    };
+  }, []);
 
   // Rafraîchit les votes du round courant pour afficher les compteurs.
   useEffect(() => {
@@ -299,6 +334,31 @@ export default function ResultsPage() {
     });
     return counts;
   }, [accusations]);
+
+  const accusersByTarget = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    accusations.forEach((a) => {
+      if (!map[a.target_player_id]) map[a.target_player_id] = [];
+      map[a.target_player_id].push(a.accuser_nickname);
+    });
+    return map;
+  }, [accusations]);
+
+  const accusationTooltipStyle = {
+    position: "absolute",
+    top: -32,
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "rgba(0,0,0,0.85)",
+    color: "white",
+    padding: "6px 8px",
+    borderRadius: 8,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+    zIndex: 2,
+  } as const;
 
   // Fallback tie detection côté client (au cas où tie_player_ids n'est pas encore propagé).
   const computedTieIds = useMemo(() => {
@@ -437,7 +497,7 @@ export default function ResultsPage() {
               alt="Rôle Civil"
               width={190}
               height={190}
-              style={{ marginTop: -20, marginBottom: -30 }}
+              style={{ marginTop: -20, marginBottom: -12 }} // laisse plus d'espace avant le nom du rôle
             />
             <div style={{ display: "grid", gap: 4 }}>
               <strong style={{ fontSize: 18, lineHeight: 1.2, marginTop: 0 }}>
@@ -482,7 +542,7 @@ export default function ResultsPage() {
                 key={p.id}
                 style={{
                   display: "grid",
-                  gap: 6,
+                  gap: 2, // rapproche l'image du nom
                   justifyItems: "center",
                   padding: 10,
                   background: "rgba(255,255,255,0.03)",
@@ -493,17 +553,17 @@ export default function ResultsPage() {
                 <Image
                   src={
                     p.role === "CAMELEON"
-                      ? "/roles/chameleon.png"
+                      ? asset("/roles/chameleon.png")
                       : p.role === "DICTATOR"
-                        ? "/roles/dictator.png"
+                        ? asset("/roles/dictator.png")
                         : p.role === "HORS_THEME"
-                          ? "/roles/hors-theme.png"
-                          : "/roles/civil.png"
+                          ? asset("/roles/hors-theme.png")
+                          : asset("/roles/civil.png")
                   }
                   alt={`Rôle ${p.role}`}
                   width={80}
                   height={80}
-                  style={{ objectFit: "contain" }}
+                  style={{ objectFit: "contain", marginBottom: -2 }} // réduit l'espace sous l'image
                 />
                 <span style={{ fontWeight: 700 }}>{p.nickname}</span>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{p.role}</span>
@@ -520,7 +580,8 @@ export default function ResultsPage() {
             .filter((p) => !p.isEliminated || p.id === result?.eliminated_player_id)
             .map((p) => {
             const count = voteCounts[p.id] || 0;
-            const accusationCount = accusationCounts[p.id] || 0;
+            const accusers = accusersByTarget[p.id] || [];
+            const accusationCount = accusers.length || accusationCounts[p.id] || 0;
             const isTop = count === maxVotes && maxVotes > 0;
             return (
               <li
@@ -540,14 +601,29 @@ export default function ResultsPage() {
                   {accusationCount > 0 && (
                     <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       {Array.from({ length: accusationCount }).map((_, i) => (
-                        <img
+                        <span
                           key={`${p.id}-accuse-${i}`}
-                          src="/chamchar.png"
-                          alt="Accusation Caméléon"
-                          width={28}
-                          height={28}
-                          style={{ borderRadius: 6, objectFit: "cover" }}
-                        />
+                          style={{ position: "relative", display: "inline-flex" }}
+                          onPointerEnter={() => showTooltip(p.id)}
+                          onPointerLeave={hideTooltip}
+                          onPointerDown={() => flashTooltip(p.id)}
+                          onBlur={hideTooltip}
+                          tabIndex={0}
+                        >
+                          <img
+                            src="/chamchar.png"
+                            alt="Accusation Caméléon"
+                            title={accusers[i] ? `Accusation par ${accusers[i]}` : "Accusation Caméléon"}
+                            width={28}
+                            height={28}
+                            style={{ borderRadius: 6, objectFit: "cover" }}
+                          />
+                          {visibleTooltipPlayerId === p.id && (
+                            <span style={accusationTooltipStyle}>
+                              {accusers[i] ? `Accusation par ${accusers[i]}` : "Accusation Caméléon"}
+                            </span>
+                          )}
+                        </span>
                       ))}
                     </span>
                   )}

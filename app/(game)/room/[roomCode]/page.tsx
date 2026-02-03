@@ -477,7 +477,7 @@ export default function LobbyPage() {
                   checked={selectedCam}
                   onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
                 />
-                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={40} height={40} style={{ objectFit: "contain" }} />
+                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={54} height={54} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -509,7 +509,7 @@ export default function LobbyPage() {
                   checked={selectedDict}
                   onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
                 />
-                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={40} height={40} style={{ objectFit: "contain" }} />
+                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={48} height={48} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -545,6 +545,7 @@ export default function LobbyPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: 6,
                     padding: "6px 10px",
                     borderRadius: 10,
@@ -552,8 +553,7 @@ export default function LobbyPage() {
                     border: "1px solid rgba(255,255,255,0.12)",
                   }}
                 >
-                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={32} height={32} />
-                  <span style={{ fontWeight: 700 }}>Caméléon</span>
+                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={48} height={48} />
                 </div>
               )}
               {selectedDict && (
@@ -561,6 +561,7 @@ export default function LobbyPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: 6,
                     padding: "6px 10px",
                     borderRadius: 10,
@@ -568,8 +569,7 @@ export default function LobbyPage() {
                     border: "1px solid rgba(255,255,255,0.12)",
                   }}
                 >
-                  <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={32} height={32} />
-                  <span style={{ fontWeight: 700 }}>Dictateur</span>
+                  <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={48} height={48} />
                 </div>
               )}
             </div>
@@ -594,40 +594,102 @@ export default function LobbyPage() {
       {!isHost && (
         <div
           className="card"
-          style={{ display: "grid", gap: 10, border: "1px solid #87ceeb" /* contour bleu clair */ }}
+          style={{ display: "grid", gap: 10, border: "1px solid rgba(255,255,255,0.2)" }}
         >
-          <h4 style={{ color: "#87ceeb" /* bleu ciel lisible */ }}>Paramètres de la partie</h4>
+          <h4 style={{ color: "rgba(255,255,255,0.8)" }}>Paramètres de la partie</h4>
           <div style={{ display: "grid", gap: 8 }}>
             <div>
-              <strong>Thème :</strong> {themeLabel}
+              <strong>Thème :</strong>{" "}
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "3px 8px",
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e5e7eb",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                {themeLabel}
+              </span>
             </div>
             <div>
               <strong>Hors-Thème :</strong>{" "}
-              <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>{htDisplay}</span>
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "3px 8px",
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e5e7eb",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                {htDisplay}
+              </span>
             </div>
             <div>
-              <strong>Rôles activés :</strong>{" "}
+              <strong>Durée du dessin :</strong>{" "}
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "3px 8px",
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#e5e7eb",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                {settings.drawing_timer_seconds ?? 60} secondes
+              </span>
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <strong>Rôles activés :</strong>
               {selectedCam || selectedDict ? (
-                <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 10,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                    alignItems: "start",
+                  }}
+                >
                   {selectedCam && (
-                    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={24} height={24} />
-                      Caméléon
-                    </span>
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 0,
+                        justifyItems: "center",
+                        padding: "8px 10px",
+                        borderRadius: 12,
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={48} height={48} />
+                      <span style={{ fontWeight: 700, fontSize: 13, marginTop: -4 }}>Caméléon</span>
+                    </div>
                   )}
                   {selectedDict && (
-                    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={24} height={24} />
-                      Dictateur
-                    </span>
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 0,
+                        justifyItems: "center",
+                        padding: "8px 10px",
+                        borderRadius: 12,
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={48} height={48} />
+                      <span style={{ fontWeight: 700, fontSize: 13, marginTop: -4 }}>Dictateur</span>
+                    </div>
                   )}
-                </span>
+                </div>
               ) : (
-                "Aucun rôle spécial"
+                <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>Aucun rôle spécial</span>
               )}
-            </div>
-            <div>
-              <strong>Durée du dessin :</strong> {settings.drawing_timer_seconds ?? 60} secondes
             </div>
           </div>
         </div>

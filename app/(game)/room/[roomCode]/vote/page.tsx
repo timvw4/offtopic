@@ -7,6 +7,7 @@ import { Player } from "@/lib/types";
 import { VotePanel } from "@/components/VotePanel";
 
 type VoteRow = { voter_nickname: string; target_player_id: string; round_id: string };
+type AccuseRow = { accuser_nickname: string; target_player_id: string };
 
 function mapPlayerRow(row: any): Player {
   return {
@@ -38,12 +39,15 @@ export default function VotePage() {
   const [isEliminated, setIsEliminated] = useState(false);
   const [isCameleonSelf, setIsCameleonSelf] = useState(false);
   const [choiceLocked, setChoiceLocked] = useState<"vote" | "accuse" | null>(null);
+  const [accusations, setAccusations] = useState<AccuseRow[]>([]);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     const room = params.roomCode;
     let channel: ReturnType<typeof supabaseClient.channel> | null = null;
     let pollPhase: NodeJS.Timeout | null = null;
     let pollVotes: NodeJS.Timeout | null = null;
+    let pollAccusations: NodeJS.Timeout | null = null;
 
     supabaseClient
       .from("players")
@@ -84,6 +88,12 @@ export default function VotePage() {
       .then(({ data }) => setHasCameleon(!!data?.has_cameleon));
 
     supabaseClient
+      .from("chameleon_accusations")
+      .select("accuser_nickname, target_player_id")
+      .eq("room_code", room)
+      .then(({ data }) => setAccusations(((data as any[]) || []) as AccuseRow[]));
+
+    supabaseClient
       .from("players")
       .select("has_used_chameleon_accusation")
       .eq("room_code", room)
@@ -116,6 +126,14 @@ export default function VotePage() {
         .then(({ data }) => setVotes((data as VoteRow[]) || []));
     }, 500);
 
+    pollAccusations = setInterval(() => {
+      supabaseClient
+        .from("chameleon_accusations")
+        .select("accuser_nickname, target_player_id")
+        .eq("room_code", room)
+        .then(({ data }) => setAccusations(((data as any[]) || []) as AccuseRow[]));
+    }, 500);
+
     pollPhase = setInterval(() => {
       supabaseClient
         .from("rooms")
@@ -129,6 +147,7 @@ export default function VotePage() {
       channel?.unsubscribe();
       if (pollPhase) clearInterval(pollPhase);
       if (pollVotes) clearInterval(pollVotes);
+      if (pollAccusations) clearInterval(pollAccusations);
     };
   }, [nickname, params.roomCode, roundId]);
 
@@ -162,6 +181,28 @@ export default function VotePage() {
     }
   }, [phase, isEliminated, nickname, params.roomCode, router]);
 
+  // Dès que tous les vivants ont voté ou accusé, l'hôte déclenche la résolution.
+  useEffect(() => {
+    if (resolving) return;
+    if (phase !== "VOTE") return;
+    const alive = players.filter((p) => !p.isEliminated);
+    if (alive.length === 0) return;
+    const allActed = alive.every((p) => {
+      const voted = votes.some((v) => v.voter_nickname === p.nickname && (!roundId || v.round_id === roundId));
+      const accused = accusations.some((a) => a.accuser_nickname === p.nickname);
+      return voted || accused || (p.nickname === nickname && choiceLocked === "accuse");
+    });
+    const me = players.find((p) => p.nickname === nickname);
+    if (!allActed || !me?.isHost) return;
+    setResolving(true);
+    fetch("/api/resolve", {
+      method: "POST",
+      body: JSON.stringify({ roomCode: params.roomCode }),
+    })
+      .then(() => setPhase("RESULTS"))
+      .catch(() => setResolving(false));
+  }, [accusations, choiceLocked, nickname, params.roomCode, phase, players, resolving, roundId, votes]);
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <h2>Vote</h2>
@@ -170,7 +211,9 @@ export default function VotePage() {
         <h4>Statut des votes</h4>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
           {voteStatusPlayers.map((p) => {
-            const voted = votes.some((v) => v.voter_nickname === p.nickname && (!roundId || v.round_id === roundId));
+            const votedFromDb = votes.some((v) => v.voter_nickname === p.nickname && (!roundId || v.round_id === roundId));
+            const accused = accusations.some((a) => a.accuser_nickname === p.nickname);
+            const voted = p.nickname === nickname && choiceLocked === "accuse" ? true : votedFromDb || accused;
             return (
               <li
                 key={p.id}
@@ -204,7 +247,9 @@ export default function VotePage() {
         {voteSubmitted && <p style={{ margin: 0 }}>Vote enregistré.</p>}
       </div>
       {!isEliminated &&
-        (hasVotedOrSubmitted ? (
+        (choiceLocked === "accuse" ? (
+          <p style={{ margin: 0 }}>Accusation envoyée. En attente des autres joueurs...</p>
+        ) : hasVotedOrSubmitted ? (
           <p style={{ margin: 0 }}>En attente des votes des autres joueurs...</p>
         ) : (
           <VotePanel
@@ -229,6 +274,8 @@ export default function VotePage() {
                 body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
               });
               setAccusationAvailable(false);
+              setVoteSubmitted(true);
+              setAccusations((prev) => [...prev, { accuser_nickname: nickname, target_player_id: playerId }]);
             }}
           />
         ))}

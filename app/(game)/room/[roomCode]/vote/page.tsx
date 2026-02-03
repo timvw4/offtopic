@@ -8,7 +8,7 @@ import { VotePanel } from "@/components/VotePanel";
 
 type VoteRow = { voter_nickname: string; target_player_id: string; round_id: string };
 type AccuseRow = { accuser_nickname: string; target_player_id: string };
-type ChoiceLock = "vote" | "accuse" | null;
+type ChoiceLock = "vote" | "accuse" | "none";
 
 function mapPlayerRow(row: any): Player {
   return {
@@ -39,7 +39,7 @@ export default function VotePage() {
   const [voteSubmitted, setVoteSubmitted] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
   const [isCameleonSelf, setIsCameleonSelf] = useState(false);
-  const [choiceLocked, setChoiceLocked] = useState<ChoiceLock>(null);
+  const [choiceLocked, setChoiceLocked] = useState<ChoiceLock>("none");
   const [accusations, setAccusations] = useState<AccuseRow[]>([]);
   const [resolving, setResolving] = useState(false);
 

@@ -135,6 +135,8 @@ export default function VotePage() {
   const eligiblePlayers =
     tieIds.length > 0 ? players.filter((p) => tieIds.includes(p.id)) : players;
   const voteTargets = eligiblePlayers.filter((p) => p.id !== selfId && !p.isEliminated);
+  const canShowAccusation = hasCameleon && !isCameleonSelf;
+  const accusationEnabled = canShowAccusation && accusationAvailable;
   const hasVoted = useMemo(
     () => votes.some((v) => v.voter_nickname === nickname && (!roundId || v.round_id === roundId)),
     [nickname, roundId, votes],
@@ -182,9 +184,9 @@ export default function VotePage() {
       {!isEliminated && (
       <VotePanel
         players={voteTargets}
-        accusationAvailable={hasCameleon && accusationAvailable}
-        showAccusation={hasCameleon}
-        disableAccusation={isCameleonSelf || choiceLocked === "vote"}
+        accusationAvailable={accusationEnabled}
+        showAccusation={canShowAccusation}
+        disableAccusation={choiceLocked === "vote"}
         disableVote={choiceLocked === "accuse" || voteSubmitted}
         hideVoteButton={voteSubmitted}
         onVote={async (playerId) => {

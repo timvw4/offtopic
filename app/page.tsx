@@ -48,6 +48,9 @@ export default function HomePage() {
     try {
       setLoading(true);
       const code = roomCode.trim().toUpperCase();
+      const pseudo = nickname.trim();
+      const playerStorageKey = `off-topic:player:${code}:${pseudo}`;
+      const storedPlayerId = typeof window !== "undefined" ? window.localStorage.getItem(playerStorageKey) : null;
       const { data } = await supabaseClient.from("rooms").select("code, current_phase").eq("code", code).maybeSingle();
       if (!data) {
         setError("Code de salle invalide ou inexistant.");
@@ -57,7 +60,24 @@ export default function HomePage() {
         setError("Partie déjà en cours, impossible de rejoindre.");
         return;
       }
-      router.push(`/room/${code}?nickname=${encodeURIComponent(nickname.trim())}`);
+      const { data: existingPlayer, error: existingPlayerError } = await supabaseClient
+        .from("players")
+        .select("id")
+        .eq("room_code", code)
+        .eq("nickname", pseudo)
+        .maybeSingle();
+
+      if (existingPlayerError) {
+        setError("Impossible de vérifier ton pseudo. Réessaie dans un instant.");
+        return;
+      }
+
+      if (existingPlayer && (!storedPlayerId || existingPlayer.id !== storedPlayerId)) {
+        setError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre.");
+        return;
+      }
+
+      router.push(`/room/${code}?nickname=${encodeURIComponent(pseudo)}`);
     } finally {
       setLoading(false);
     }

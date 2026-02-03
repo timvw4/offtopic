@@ -2,10 +2,9 @@
 
 interface Props {
   word: string;
-  roleLabel: string;
 }
 
-export function WordCard({ word, roleLabel }: Props) {
+export function WordCard({ word }: Props) {
   return (
     <div
       className="card"
@@ -17,7 +16,6 @@ export function WordCard({ word, roleLabel }: Props) {
         boxShadow: "none",
       }}
     >
-      <p style={{ fontSize: 12, letterSpacing: 1.4, textTransform: "uppercase", marginBottom: 6 }}>{roleLabel}</p>
       <p style={{ fontSize: 32, fontWeight: 800 }}>{word}</p>
     </div>
   );

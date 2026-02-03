@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 const SOURCE = "/embience.wav"; // veille à ce que le fichier soit présent dans public/
 
-export function AmbientAudio() {
+type Placement = "top" | "bottom";
+
+export function AmbientAudio({ placement = "bottom" }: { placement?: Placement }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +68,8 @@ export function AmbientAudio() {
     <div
       className="audio-floating"
       style={{
+        top: placement === "top" ? "max(12px, env(safe-area-inset-top))" : "auto",
+        bottom: placement === "bottom" ? "max(12px, env(safe-area-inset-bottom, 12px))" : "auto",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

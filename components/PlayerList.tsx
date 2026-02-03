@@ -18,7 +18,14 @@ export function PlayerList({
   dimEliminated = true,
 }: Props) {
   return (
-    <div className="card" style={{ display: "grid", gap: 10 }}>
+    <div
+      className="card"
+      style={{
+        display: "grid",
+        gap: 10,
+        border: "1px solid rgba(250, 204, 21, 0.6)" /* contour jaune légèrement transparent */,
+      }}
+    >
       <h3>Joueurs</h3>
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
         {players.map((p) => (

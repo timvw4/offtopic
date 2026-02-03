@@ -181,10 +181,11 @@ export default function RevealPage() {
   useEffect(() => {
     const room = params.roomCode;
     if (!room) return;
-    if (phase === "REVEAL") return;
-    // On force la phase côté room ; appels multiples inoffensifs.
+    // Ne force la phase que si on est encore en DRAW (sécurité) et seulement côté hôte.
+    if (phase !== "DRAW") return;
+    if (!isHost) return;
     supabaseClient.from("rooms").update({ current_phase: "REVEAL" }).eq("code", room).then();
-  }, [params.roomCode, phase]);
+  }, [isHost, params.roomCode, phase]);
 
   // Redirige tout le monde quand la phase passe à VOTE
   useEffect(() => {

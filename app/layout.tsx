@@ -2,9 +2,13 @@
 
 import "./globals.css";
 import { ReactNode, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { AmbientAudio } from "@/components/AmbientAudio";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isHome = pathname === "/";
+
   useEffect(() => {
     // Bloque le pinch-to-zoom et le double-tap zoom sur mobile
     const preventPinch = (e: any) => {
@@ -42,7 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <main className="app-shell">{children}</main>
-        <AmbientAudio />
+        <AmbientAudio placement={isHome ? "top" : "bottom"} />
       </body>
     </html>
   );

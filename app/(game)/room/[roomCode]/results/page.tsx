@@ -31,6 +31,11 @@ interface VoteRow {
   weight?: number | null;
 }
 
+interface ChameleonAccusationRow {
+  target_player_id: string;
+  accuser_nickname: string;
+}
+
 export default function ResultsPage() {
   const params = useParams<{ roomCode: string }>();
   const search = useSearchParams();
@@ -43,6 +48,7 @@ export default function ResultsPage() {
   const [phase, setPhase] = useState<string | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
   const [tieIds, setTieIds] = useState<string[]>([]);
+  const [accusations, setAccusations] = useState<ChameleonAccusationRow[]>([]);
   const resolvedRef = useRef(false);
 
   useEffect(() => {
@@ -87,6 +93,12 @@ export default function ResultsPage() {
       .then(({ data }) => setVotes((data as VoteRow[]) || []));
 
     supabaseClient
+      .from("chameleon_accusations")
+      .select("target_player_id, accuser_nickname")
+      .eq("room_code", room)
+      .then(({ data }) => setAccusations((data as ChameleonAccusationRow[]) || []));
+
+    supabaseClient
       .from("rooms")
       .select("current_phase")
       .eq("code", room)
@@ -109,6 +121,17 @@ export default function ResultsPage() {
             .select("*")
             .eq("room_code", room)
             .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chameleon_accusations", filter: `room_code=eq.${room}` },
+        () => {
+          supabaseClient
+            .from("chameleon_accusations")
+            .select("target_player_id, accuser_nickname")
+            .eq("room_code", room)
+            .then(({ data }) => setAccusations((data as ChameleonAccusationRow[]) || []));
         },
       )
       .subscribe();
@@ -260,6 +283,14 @@ export default function ResultsPage() {
 
   const maxVotes = useMemo(() => Math.max(0, ...Object.values(voteCounts)), [voteCounts]);
 
+  const accusationCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    accusations.forEach((a) => {
+      counts[a.target_player_id] = (counts[a.target_player_id] || 0) + 1;
+    });
+    return counts;
+  }, [accusations]);
+
   // Fallback tie detection côté client (au cas où tie_player_ids n'est pas encore propagé).
   const computedTieIds = useMemo(() => {
     if (tieIds.length > 0) return tieIds;
@@ -395,6 +426,7 @@ export default function ResultsPage() {
             .filter((p) => !p.isEliminated || p.id === result?.eliminated_player_id)
             .map((p) => {
             const count = voteCounts[p.id] || 0;
+            const accusationCount = accusationCounts[p.id] || 0;
             const isTop = count === maxVotes && maxVotes > 0;
             return (
               <li
@@ -410,7 +442,23 @@ export default function ResultsPage() {
                 }}
               >
                 <span>{p.nickname}</span>
-                <span>{count} vote(s)</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {accusationCount > 0 && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      {Array.from({ length: accusationCount }).map((_, i) => (
+                        <img
+                          key={`${p.id}-accuse-${i}`}
+                          src="/chamchar.png"
+                          alt="Accusation Caméléon"
+                          width={28}
+                          height={28}
+                          style={{ borderRadius: 6, objectFit: "cover" }}
+                        />
+                      ))}
+                    </span>
+                  )}
+                  <span>{count} vote(s)</span>
+                </span>
               </li>
             );
           })}

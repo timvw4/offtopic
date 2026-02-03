@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { WordCard } from "@/components/WordCard";
 import { Player } from "@/lib/types";
+
+// Ajoute un paramètre de version pour forcer le rechargement des nouvelles images.
+const ASSET_VERSION = "v2";
+const asset = (path: string) => `${path}?v=${ASSET_VERSION}`;
 
 function mapPlayer(row: any): Player {
   return {
@@ -187,13 +192,36 @@ export default function WordRevealPage() {
         : role === "DICTATOR"
           ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
           : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème.";
+  const roleMedia =
+    role === "CAMELEON"
+      ? { src: asset("/roles/chameleon.png"), alt: "Caméléon" }
+      : role === "DICTATOR"
+        ? { src: asset("/roles/dictator.png"), alt: "Dictateur" }
+        : role === "HORS_THEME"
+          ? { src: asset("/hors-theme.png"), alt: "Hors-Thème" }
+          : role === "CIVIL"
+            ? { src: asset("/civil.png"), alt: "Civil" }
+            : null;
+  const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 140 : 96;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <h2>Mot secret</h2>
-      <WordCard word={displayedWord} roleLabel={`Tu es ${roleLabel}`} />
-      <div className="card" style={{ display: "grid", gap: 6 }}>
-        <strong>Ton rôle : {roleLabel}</strong>
+      <WordCard word={displayedWord} />
+      <div
+        className="card"
+        style={{ display: "grid", gap: 6, textAlign: "center", alignItems: "center", justifyItems: "center" }}
+      >
+        {roleMedia && (
+          <Image
+            src={roleMedia.src}
+            alt={roleMedia.alt}
+            width={roleImageSize}
+            height={roleImageSize}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))" }}
+          />
+        )}
+        <strong style={{ marginTop: -4 }}>Ton rôle : {roleLabel}</strong>
         <p style={{ margin: 0 }}>{roleDescription}</p>
       </div>
 

@@ -7,6 +7,10 @@ import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
 import { PlayerList } from "@/components/PlayerList";
 
+// Ajoute un paramètre de version pour forcer le rechargement des nouvelles images.
+const ASSET_VERSION = "v2";
+const asset = (path: string) => `${path}?v=${ASSET_VERSION}`;
+
 type RoomSettings = {
   hors_theme_count: number;
   has_cameleon: boolean;
@@ -54,6 +58,7 @@ export default function LobbyPage() {
   const [showCamTooltip, setShowCamTooltip] = useState(false);
   const [showDictTooltip, setShowDictTooltip] = useState(false);
   const [showRolesList, setShowRolesList] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const playerCount = players.length;
   const { options } = allowedSettings(playerCount);
@@ -75,6 +80,10 @@ export default function LobbyPage() {
   const themeLabel = themes.find((t) => t.value === selectedTheme)?.label ?? "Général";
 
   const isHost = useMemo(() => settings.host_nickname === nickname, [settings.host_nickname, nickname]);
+  const playerStorageKey = useMemo(
+    () => `off-topic:player:${params.roomCode}:${nickname}`,
+    [params.roomCode, nickname],
+  ); // Utilisé pour autoriser une reconnexion avec le même navigateur.
 
   useEffect(() => {
     const room = params.roomCode;
@@ -83,12 +92,36 @@ export default function LobbyPage() {
     let pollPlayers: NodeJS.Timeout | null = null;
 
     async function init() {
+      setJoinError(null);
       // 1) Crée la room si elle n'existe pas
-      const { data: roomRow } = await supabaseClient
+      const { data: roomRow, error: roomError } = await supabaseClient
         .from("rooms")
         .select("*")
         .eq("code", room)
         .maybeSingle();
+      if (roomError) {
+        setJoinError("Impossible de vérifier la salle pour le moment. Réessaie.");
+        return;
+      }
+
+      const storedPlayerId = typeof window !== "undefined" ? window.localStorage.getItem(playerStorageKey) : null;
+      const { data: existingPlayer, error: existingPlayerError } = await supabaseClient
+        .from("players")
+        .select("id, nickname")
+        .eq("room_code", room)
+        .eq("nickname", nickname)
+        .maybeSingle();
+
+      if (existingPlayerError) {
+        setJoinError("Impossible de vérifier ton pseudo pour cette salle. Réessaie dans un instant.");
+        return;
+      }
+
+      const isSameBrowser = existingPlayer && storedPlayerId && existingPlayer.id === storedPlayerId;
+      if (existingPlayer && !isSameBrowser) {
+        setJoinError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre pour rejoindre.");
+        return;
+      }
 
       let hostNickname = roomRow?.host_nickname;
       if (!roomRow) {
@@ -124,16 +157,77 @@ export default function LobbyPage() {
 
       const amHost = hostNickname === nickname;
 
-      // 2) Upsert player avec flag hôte
-      await supabaseClient.from("players").upsert({
-        room_code: room,
-        nickname,
-        role: "CIVIL",
-        has_used_chameleon_accusation: false,
-        is_eliminated: false,
-        is_host: amHost,
-        is_in_lobby: true,
-      });
+      // 2) Upsert player avec flag hôte, sans requête RETURNING (évite les erreurs RLS)
+      let savedPlayerId = existingPlayer?.id ?? null;
+      if (existingPlayer) {
+        const { error: updateError } = await supabaseClient
+          .from("players")
+          .update({
+            is_in_lobby: true,
+            is_host: existingPlayer.nickname === hostNickname ? true : amHost,
+            has_used_chameleon_accusation: false,
+            is_eliminated: false,
+          })
+          .eq("id", existingPlayer.id);
+        if (updateError) {
+          setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (upd).");
+          return;
+        }
+      } else {
+        const { data: inserted, error: insertError } = await supabaseClient
+          .from("players")
+          .insert({
+            room_code: room,
+            nickname,
+            role: "CIVIL",
+            has_used_chameleon_accusation: false,
+            is_eliminated: false,
+            is_host: amHost,
+            is_in_lobby: true,
+          })
+          .select("id")
+          .single();
+        if (insertError) {
+          // Gestion du cas de doublon (autre onglet a inséré juste avant)
+          if ((insertError as any)?.code === "23505") {
+            const { data: fetchedExisting, error: fetchError } = await supabaseClient
+              .from("players")
+              .select("id")
+              .eq("room_code", room)
+              .eq("nickname", nickname)
+              .maybeSingle();
+            if (fetchError) {
+              setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (dup).");
+              return;
+            }
+            savedPlayerId = fetchedExisting?.id ?? null;
+          } else {
+            // On vérifie quand même si le pseudo existe déjà, pour afficher le bon message.
+            const { data: fetchedExisting } = await supabaseClient
+              .from("players")
+              .select("id")
+              .eq("room_code", room)
+              .eq("nickname", nickname)
+              .maybeSingle();
+            if (fetchedExisting?.id) {
+              setJoinError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre pour rejoindre.");
+            } else {
+              setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (ins).");
+            }
+            return;
+          }
+        } else {
+          savedPlayerId = inserted?.id ?? null;
+        }
+      }
+
+      if (savedPlayerId && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(playerStorageKey, savedPlayerId);
+        } catch {
+          // Si le stockage échoue, on continue malgré tout : le pseudo restera réservé côté base.
+        }
+      }
 
       // 3) Charge la liste des joueurs
       const { data: pData } = await supabaseClient.from("players").select("*").eq("room_code", room);
@@ -188,7 +282,7 @@ export default function LobbyPage() {
       channel?.unsubscribe();
       if (pollPlayers) clearInterval(pollPlayers);
     };
-  }, [nickname, params.roomCode]);
+  }, [nickname, params.roomCode, playerStorageKey]);
 
   // Redirige quand la phase passe à WORD (tous les joueurs suivent l'hôte)
   useEffect(() => {
@@ -224,20 +318,43 @@ export default function LobbyPage() {
   ) {
     const room = params.roomCode;
     const nextTheme = word_theme ?? settings.word_theme ?? "general";
+    const prev = settings;
     setSettings((s) => ({ ...s, hors_theme_count, has_cameleon, has_dictator, word_theme: nextTheme }));
-    await supabaseClient
+    const { error } = await supabaseClient
       .from("rooms")
       .update({ hors_theme_count, has_cameleon, has_dictator, word_theme: nextTheme })
       .eq("code", room);
+    if (error) {
+      // Si l'écriture échoue (ex : RLS), on rétablit l'état local et on affiche un message.
+      setSettings(prev);
+      alert("Impossible de mettre à jour les paramètres de la partie. Réessaie ou vérifie les droits Supabase.");
+    }
   }
 
   async function updateTimer(seconds: number) {
     const room = params.roomCode;
+    const prev = settings;
     setSettings((s) => ({ ...s, drawing_timer_seconds: seconds }));
-    await supabaseClient.from("rooms").update({ drawing_timer_seconds: seconds }).eq("code", room);
+    const { error } = await supabaseClient.from("rooms").update({ drawing_timer_seconds: seconds }).eq("code", room);
+    if (error) {
+      setSettings(prev);
+      alert("Impossible de mettre à jour le minuteur. Réessaie ou vérifie les droits Supabase.");
+    }
   }
 
   const startDisabled = playerCount < 3 || playerCount > 8;
+
+  if (joinError) {
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
+        <h2>Impossible de rejoindre</h2>
+        <p style={{ margin: 0, color: "#f87171" }}>{joinError}</p>
+        <button className="btn" type="button" onClick={() => router.push("/")}>
+          Retour à l&apos;accueil
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -245,8 +362,11 @@ export default function LobbyPage() {
       <PlayerList players={players} showStatus={false} dimEliminated={false} />
 
       {isHost && (
-        <div className="card" style={{ display: "grid", gap: 10 }}>
-          <h4>Paramètres de rôle (Hôte)</h4>
+        <div
+          className="card"
+          style={{ display: "grid", gap: 10, border: "1px solid #87ceeb" /* contour bleu clair */ }}
+        >
+          <h4 style={{ color: "#87ceeb" /* bleu ciel lisible */ }}>Paramètres de rôle (Hôte)</h4>
           <label style={{ display: "grid", gap: 6 }}>
             Thème des mots
             <select
@@ -279,7 +399,7 @@ export default function LobbyPage() {
             type="button"
             className="btn btn-compact btn-ghost"
             style={{
-              border: "1.5px solid rgba(250, 204, 21, 0.7)",
+              border: "1.5px solid #87ceeb" /* contour bleu clair */,
               color: "#fff",
               background: "rgba(0, 0, 0, 0.82)",
               position: "relative",
@@ -340,7 +460,7 @@ export default function LobbyPage() {
                   checked={selectedCam}
                   onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
                 />
-                <Image src="/roles/chameleon.png" alt="Caméléon" width={40} height={40} style={{ objectFit: "contain" }} />
+                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={40} height={40} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -372,7 +492,7 @@ export default function LobbyPage() {
                   checked={selectedDict}
                   onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
                 />
-                <Image src="/roles/dictator.png" alt="Dictateur" width={40} height={40} style={{ objectFit: "contain" }} />
+                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={40} height={40} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -415,7 +535,7 @@ export default function LobbyPage() {
                     border: "1px solid rgba(255,255,255,0.12)",
                   }}
                 >
-                  <Image src="/roles/chameleon.png" alt="Caméléon sélectionné" width={32} height={32} />
+                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={32} height={32} />
                   <span style={{ fontWeight: 700 }}>Caméléon</span>
                 </div>
               )}
@@ -431,7 +551,7 @@ export default function LobbyPage() {
                     border: "1px solid rgba(255,255,255,0.12)",
                   }}
                 >
-                  <Image src="/roles/dictator.png" alt="Dictateur sélectionné" width={32} height={32} />
+                  <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={32} height={32} />
                   <span style={{ fontWeight: 700 }}>Dictateur</span>
                 </div>
               )}
@@ -455,11 +575,11 @@ export default function LobbyPage() {
       )}
 
       {!isHost && (
-        <div className="card" style={{ display: "grid", gap: 10 }}>
-          <h4>Paramètres de la partie</h4>
-          <p style={{ margin: 0, color: "var(--muted)" }}>
-            Lecture seule : seuls les hôtes peuvent modifier ces valeurs.
-          </p>
+        <div
+          className="card"
+          style={{ display: "grid", gap: 10, border: "1px solid #87ceeb" /* contour bleu clair */ }}
+        >
+          <h4 style={{ color: "#87ceeb" /* bleu ciel lisible */ }}>Paramètres de la partie</h4>
           <div style={{ display: "grid", gap: 8 }}>
             <div>
               <strong>Thème :</strong> {themeLabel}
@@ -473,13 +593,13 @@ export default function LobbyPage() {
                 <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
                   {selectedCam && (
                     <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      <Image src="/roles/chameleon.png" alt="Caméléon" width={24} height={24} />
+                      <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={24} height={24} />
                       Caméléon
                     </span>
                   )}
                   {selectedDict && (
                     <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                      <Image src="/roles/dictator.png" alt="Dictateur" width={24} height={24} />
+                      <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={24} height={24} />
                       Dictateur
                     </span>
                   )}
@@ -492,9 +612,6 @@ export default function LobbyPage() {
               <strong>Durée du dessin :</strong> {settings.drawing_timer_seconds ?? 60} secondes
             </div>
           </div>
-          <small style={{ color: "var(--muted)" }}>
-            Les changements de l&apos;hôte sont reçus en direct : pas besoin d&apos;actualiser.
-          </small>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
@@ -59,6 +59,8 @@ export default function LobbyPage() {
   const [showDictTooltip, setShowDictTooltip] = useState(false);
   const [showRolesList, setShowRolesList] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  // Empêche deux appels concurrents à init (évite le faux positif "pseudo déjà utilisé")
+  const initLockRef = useRef(false);
 
   const playerCount = players.length;
   const { options } = allowedSettings(playerCount);
@@ -69,17 +71,33 @@ export default function LobbyPage() {
   const selectedTheme = settings.word_theme || "general";
   const htDisplay = selectedHt === 1 ? "1 Hors-Thème" : `${selectedHt} Hors-Thèmes`;
 
+  // Liste des thèmes disponibles (alignée avec la nouvelle seed SQL 0017)
   const themes = [
     { value: "general", label: "Général" },
-    { value: "animaux", label: "Animaux" },
-    { value: "nourriture", label: "Nourriture" },
-    { value: "voyage", label: "Voyage" },
-    { value: "objets", label: "Objets du quotidien" },
-    { value: "sport", label: "Sport" },
+    { value: "objets_quotidien", label: "Objets du quotidien" },
+    { value: "situations", label: "Situations" },
+    { value: "nature", label: "Nature" },
     { value: "technologie", label: "Technologie" },
+    { value: "divertissement", label: "Divertissement" },
   ];
 
   const themeLabel = themes.find((t) => t.value === selectedTheme)?.label ?? "Général";
+  const getRoleCheckboxStyle = (checked: boolean) => ({
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+    MozAppearance: "none" as const,
+    width: 22,
+    height: 22,
+    borderRadius: "50%",
+    border: "2px solid #87ceeb",
+    background: checked ? "#87ceeb" : "rgba(255,255,255,0.06)",
+    boxShadow: checked ? "0 0 0 3px rgba(135,206,235,0.35)" : "inset 0 0 0 1px rgba(255,255,255,0.12)",
+    display: "grid",
+    placeItems: "center",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    flexShrink: 0,
+  });
 
   const isHost = useMemo(() => settings.host_nickname === nickname, [settings.host_nickname, nickname]);
   const playerStorageKey = useMemo(
@@ -94,104 +112,113 @@ export default function LobbyPage() {
     let pollPlayers: NodeJS.Timeout | null = null;
 
     async function init() {
-      setJoinError(null);
-      // 1) Crée la room si elle n'existe pas
-      const { data: roomRow, error: roomError } = await supabaseClient
-        .from("rooms")
-        .select("*")
-        .eq("code", room)
-        .maybeSingle();
-      if (roomError) {
-        setJoinError("Impossible de vérifier la salle pour le moment. Réessaie.");
-        return;
-      }
-
-      const storedPlayerId = typeof window !== "undefined" ? window.localStorage.getItem(playerStorageKey) : null;
-      const { data: existingPlayer, error: existingPlayerError } = await supabaseClient
-        .from("players")
-        .select("id, nickname")
-        .eq("room_code", room)
-        .eq("nickname", nickname)
-        .maybeSingle();
-
-      if (existingPlayerError) {
-        setJoinError("Impossible de vérifier ton pseudo pour cette salle. Réessaie dans un instant.");
-        return;
-      }
-
-      const isSameBrowser = existingPlayer && storedPlayerId && existingPlayer.id === storedPlayerId;
-      if (existingPlayer && !isSameBrowser) {
-        setJoinError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre pour rejoindre.");
-        return;
-      }
-
-      let hostNickname = roomRow?.host_nickname;
-      if (!roomRow) {
-        // La room n'existe pas, on la crée et on désigne l'utilisateur courant comme hôte.
-        hostNickname = nickname;
-        await supabaseClient
+      if (initLockRef.current) return;
+      initLockRef.current = true;
+      try {
+        setJoinError(null);
+        // 1) Crée la room si elle n'existe pas
+        const { data: roomRow, error: roomError } = await supabaseClient
           .from("rooms")
-          .insert({
-            code: room,
-            host_nickname: hostNickname,
-            hors_theme_count: 1,
-            has_cameleon: false,
-            has_dictator: false,
-            current_phase: "LOBBY",
-            word_theme: "general",
-          })
-          .select();
-      } else if (!hostNickname) {
-        // La room existe mais aucun hôte n'est défini : on assigne l'utilisateur courant.
-        hostNickname = nickname;
-        await supabaseClient.from("rooms").update({ host_nickname: hostNickname }).eq("code", room);
-      }
-
-      setSettings({
-        hors_theme_count: roomRow?.hors_theme_count ?? 1,
-        has_cameleon: roomRow?.has_cameleon ?? false,
-        has_dictator: roomRow?.has_dictator ?? false,
-        host_nickname: hostNickname,
-        current_phase: roomRow?.current_phase ?? "LOBBY",
-        drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
-        word_theme: roomRow?.word_theme ?? "general",
-      });
-
-      const amHost = hostNickname === nickname;
-
-      // 2) Upsert player avec flag hôte, sans requête RETURNING (évite les erreurs RLS)
-      let savedPlayerId = existingPlayer?.id ?? null;
-      if (existingPlayer) {
-        const { error: updateError } = await supabaseClient
-          .from("players")
-          .update({
-            is_in_lobby: true,
-            is_host: existingPlayer.nickname === hostNickname ? true : amHost,
-            has_used_chameleon_accusation: false,
-            is_eliminated: false,
-          })
-          .eq("id", existingPlayer.id);
-        if (updateError) {
-          setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (upd).");
+          .select("*")
+          .eq("code", room)
+          .maybeSingle();
+        if (roomError) {
+          setJoinError("Impossible de vérifier la salle pour le moment. Réessaie.");
           return;
         }
-      } else {
-        const { data: inserted, error: insertError } = await supabaseClient
+
+        const storedPlayerId = typeof window !== "undefined" ? window.localStorage.getItem(playerStorageKey) : null;
+        const { data: existingPlayer, error: existingPlayerError } = await supabaseClient
           .from("players")
-          .insert({
-            room_code: room,
-            nickname,
-            role: "CIVIL",
-            has_used_chameleon_accusation: false,
-            is_eliminated: false,
-            is_host: amHost,
-            is_in_lobby: true,
-          })
-          .select("id")
-          .single();
-        if (insertError) {
-          // Gestion du cas de doublon (autre onglet a inséré juste avant)
-          if ((insertError as any)?.code === "23505") {
+          .select("id, nickname, is_in_lobby")
+          .eq("room_code", room)
+          .eq("nickname", nickname)
+          .maybeSingle();
+
+        if (existingPlayerError) {
+          setJoinError("Impossible de vérifier ton pseudo pour cette salle. Réessaie dans un instant.");
+          return;
+        }
+
+        const isSameBrowser = existingPlayer && storedPlayerId && existingPlayer.id === storedPlayerId;
+        const isGhost = existingPlayer?.is_in_lobby === false;
+        if (existingPlayer && !isSameBrowser && !isGhost) {
+          setJoinError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre pour rejoindre.");
+          return;
+        }
+
+        let hostNickname = roomRow?.host_nickname;
+        if (!roomRow) {
+          // La room n'existe pas, on la crée et on désigne l'utilisateur courant comme hôte.
+          hostNickname = nickname;
+          await supabaseClient
+            .from("rooms")
+            .insert({
+              code: room,
+              host_nickname: hostNickname,
+              hors_theme_count: 1,
+              has_cameleon: false,
+              has_dictator: false,
+              current_phase: "LOBBY",
+              word_theme: "general",
+            })
+            .select();
+        } else if (!hostNickname) {
+          // La room existe mais aucun hôte n'est défini : on assigne l'utilisateur courant.
+          hostNickname = nickname;
+          await supabaseClient.from("rooms").update({ host_nickname: hostNickname }).eq("code", room);
+        }
+
+        setSettings({
+          hors_theme_count: roomRow?.hors_theme_count ?? 1,
+          has_cameleon: roomRow?.has_cameleon ?? false,
+          has_dictator: roomRow?.has_dictator ?? false,
+          host_nickname: hostNickname,
+          current_phase: roomRow?.current_phase ?? "LOBBY",
+          drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
+          word_theme: roomRow?.word_theme ?? "general",
+        });
+
+        const amHost = hostNickname === nickname;
+
+        // 2) Upsert player avec flag hôte, sans requête RETURNING (évite les erreurs RLS)
+        let savedPlayerId = existingPlayer?.id ?? null;
+        const reactivatePlayer = async (id: string) => {
+          const { error: updateError } = await supabaseClient
+            .from("players")
+            .update({
+              is_in_lobby: true,
+              is_host: existingPlayer?.nickname === hostNickname ? true : amHost,
+              has_used_chameleon_accusation: false,
+              is_eliminated: false,
+            })
+            .eq("id", id);
+          if (updateError) {
+            setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (upd).");
+            return false;
+          }
+          return true;
+        };
+
+        if (existingPlayer) {
+          const ok = await reactivatePlayer(existingPlayer.id);
+          if (!ok) return;
+        } else {
+          const { data: inserted, error: insertError } = await supabaseClient
+            .from("players")
+            .insert({
+              room_code: room,
+              nickname,
+              role: "CIVIL",
+              has_used_chameleon_accusation: false,
+              is_eliminated: false,
+              is_host: amHost,
+              is_in_lobby: true,
+            })
+            .select("id")
+            .single();
+          if (insertError) {
+            // Gestion du cas de doublon ou d'une insertion concurrente : on récupère puis on réactive.
             const { data: fetchedExisting, error: fetchError } = await supabaseClient
               .from("players")
               .select("id")
@@ -202,85 +229,81 @@ export default function LobbyPage() {
               setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (dup).");
               return;
             }
-            savedPlayerId = fetchedExisting?.id ?? null;
-          } else {
-            // On vérifie quand même si le pseudo existe déjà, pour afficher le bon message.
-            const { data: fetchedExisting } = await supabaseClient
-              .from("players")
-              .select("id")
-              .eq("room_code", room)
-              .eq("nickname", nickname)
-              .maybeSingle();
             if (fetchedExisting?.id) {
-              setJoinError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre pour rejoindre.");
+              savedPlayerId = fetchedExisting.id;
+              const ok = await reactivatePlayer(fetchedExisting.id);
+              if (!ok) return;
             } else {
               setJoinError("Impossible de rejoindre la salle pour le moment. Réessaie (ins).");
+              return;
             }
-            return;
+          } else {
+            savedPlayerId = inserted?.id ?? null;
           }
-        } else {
-          savedPlayerId = inserted?.id ?? null;
         }
-      }
 
-      if (savedPlayerId && typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(playerStorageKey, savedPlayerId);
-        } catch {
-          // Si le stockage échoue, on continue malgré tout : le pseudo restera réservé côté base.
+        if (savedPlayerId && typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(playerStorageKey, savedPlayerId);
+          } catch {
+            // Si le stockage échoue, on continue malgré tout : le pseudo restera réservé côté base.
+          }
         }
+
+        // 3) Charge la liste des joueurs
+        const { data: pData } = await supabaseClient.from("players").select("*").eq("room_code", room);
+        setPlayers((pData || []).map(mapPlayerRow));
+
+        // 4) Realtime
+        channel = supabaseClient
+          .channel(`room:${room}`)
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "players", filter: `room_code=eq.${room}` },
+            (p) => {
+              if (p.eventType === "INSERT" || p.eventType === "UPDATE" || p.eventType === "DELETE") {
+                supabaseClient
+                  .from("players")
+                  .select("*")
+                  .eq("room_code", room)
+                  .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
+              }
+            },
+          )
+          .on(
+            "postgres_changes",
+            { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${room}` },
+            ({ new: n }) => {
+              setSettings((prev) => ({
+                hors_theme_count: n?.hors_theme_count ?? prev.hors_theme_count,
+                has_cameleon: n?.has_cameleon ?? prev.has_cameleon,
+                has_dictator: n?.has_dictator ?? prev.has_dictator,
+                host_nickname: n?.host_nickname ?? prev.host_nickname,
+                current_phase: n?.current_phase ?? prev.current_phase,
+                drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
+                word_theme: n?.word_theme ?? prev.word_theme ?? "general",
+              }));
+            },
+          )
+          .subscribe();
+
+        // Polling de secours pour mettre à jour la liste des joueurs (ex : si l'hôte ne reçoit pas le realtime)
+        pollPlayers = setInterval(() => {
+          supabaseClient
+            .from("players")
+            .select("*")
+            .eq("room_code", room)
+            .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
+        }, 2000);
+      } finally {
+        initLockRef.current = false;
       }
-
-      // 3) Charge la liste des joueurs
-      const { data: pData } = await supabaseClient.from("players").select("*").eq("room_code", room);
-      setPlayers((pData || []).map(mapPlayerRow));
-
-      // 4) Realtime
-      channel = supabaseClient
-        .channel(`room:${room}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "players", filter: `room_code=eq.${room}` },
-          (p) => {
-            if (p.eventType === "INSERT" || p.eventType === "UPDATE" || p.eventType === "DELETE") {
-              supabaseClient
-                .from("players")
-                .select("*")
-                .eq("room_code", room)
-                .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
-            }
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${room}` },
-          ({ new: n }) => {
-            setSettings((prev) => ({
-              hors_theme_count: n?.hors_theme_count ?? prev.hors_theme_count,
-              has_cameleon: n?.has_cameleon ?? prev.has_cameleon,
-              has_dictator: n?.has_dictator ?? prev.has_dictator,
-              host_nickname: n?.host_nickname ?? prev.host_nickname,
-              current_phase: n?.current_phase ?? prev.current_phase,
-              drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
-              word_theme: n?.word_theme ?? prev.word_theme ?? "general",
-            }));
-          },
-        )
-        .subscribe();
-
-      // Polling de secours pour mettre à jour la liste des joueurs (ex : si l'hôte ne reçoit pas le realtime)
-      pollPlayers = setInterval(() => {
-        supabaseClient
-          .from("players")
-          .select("*")
-          .eq("room_code", room)
-          .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
-      }, 2000);
     }
 
     void init();
 
     return () => {
+      initLockRef.current = false;
       channel?.unsubscribe();
       if (pollPlayers) clearInterval(pollPlayers);
     };
@@ -475,9 +498,10 @@ export default function LobbyPage() {
                 <input
                   type="checkbox"
                   checked={selectedCam}
+                  style={getRoleCheckboxStyle(selectedCam)}
                   onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
                 />
-                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={54} height={54} style={{ objectFit: "contain" }} />
+                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -503,13 +527,15 @@ export default function LobbyPage() {
                   </small>
                 </div>
               </label>
+              <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
               <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <input
                   type="checkbox"
                   checked={selectedDict}
+                  style={getRoleCheckboxStyle(selectedDict)}
                   onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
                 />
-                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={48} height={48} style={{ objectFit: "contain" }} />
+                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -648,42 +674,35 @@ export default function LobbyPage() {
               {selectedCam || selectedDict ? (
                 <div
                   style={{
-                    display: "grid",
-                    gap: 10,
-                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-                    alignItems: "start",
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    justifyContent: "flex-start",
                   }}
                 >
                   {selectedCam && (
                     <div
                       style={{
-                        display: "grid",
-                        gap: 0,
-                        justifyItems: "center",
-                        padding: "8px 10px",
-                        borderRadius: 12,
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.18)",
+                    display: "grid",
+                    justifyItems: "center",
+                    gap: 4,
                       }}
                     >
-                      <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={48} height={48} />
-                      <span style={{ fontWeight: 700, fontSize: 13, marginTop: -4 }}>Caméléon</span>
+                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={64} height={64} />
+                  <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Caméléon</span>
                     </div>
                   )}
                   {selectedDict && (
                     <div
                       style={{
-                        display: "grid",
-                        gap: 0,
-                        justifyItems: "center",
-                        padding: "8px 10px",
-                        borderRadius: 12,
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.18)",
+                    display: "grid",
+                    justifyItems: "center",
+                    gap: 4,
                       }}
                     >
-                      <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={48} height={48} />
-                      <span style={{ fontWeight: 700, fontSize: 13, marginTop: -4 }}>Dictateur</span>
+                  <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={64} height={64} />
+                  <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Dictateur</span>
                     </div>
                   )}
                 </div>

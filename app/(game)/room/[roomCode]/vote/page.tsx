@@ -173,6 +173,10 @@ export default function VotePage() {
   const hasVotedOrSubmitted = hasVoted || voteSubmitted;
   const isAccuseLocked = choiceLocked === CHOICE_LOCK.ACCUSE;
   const isVoteLocked = choiceLocked === CHOICE_LOCK.VOTE;
+  const resolutionLeader = useMemo(() => {
+    const alive = players.filter((p) => !p.isEliminated);
+    return alive.length > 0 ? [...alive].sort((a, b) => a.nickname.localeCompare(b.nickname))[0].nickname : null;
+  }, [players]);
 
   // Si on recharge après avoir déjà voté, on cache aussi le panneau et on affiche le message.
   useEffect(() => {
@@ -191,7 +195,7 @@ export default function VotePage() {
     }
   }, [phase, isEliminated, nickname, params.roomCode, router]);
 
-  // Dès que tous les vivants ont voté ou accusé, l'hôte déclenche la résolution.
+  // Dès que tous les vivants ont voté ou accusé, on déclenche la résolution (leader alphabétique pour éviter les doublons).
   useEffect(() => {
     if (resolving) return;
     if (phase !== "VOTE") return;
@@ -202,8 +206,9 @@ export default function VotePage() {
       const accused = accusations.some((a) => a.accuser_nickname === p.nickname);
       return voted || accused || (p.nickname === nickname && isAccuseLocked);
     });
-    const me = players.find((p) => p.nickname === nickname);
-    if (!allActed || !me?.isHost) return;
+    if (!allActed) return;
+    const isLeader = resolutionLeader === nickname;
+    if (!isLeader) return;
     setResolving(true);
     fetch("/api/resolve", {
       method: "POST",

@@ -253,15 +253,13 @@ export default function WordRevealPage() {
   const roleImageStyle = {
     objectFit: "contain",
     filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))",
-    marginTop: -30,
+    marginTop: -10,
     marginBottom: role === "CIVIL" ? -7 : 0, // décale le titre vers le bas pour Civil
   } as const;
   const roleLabelMarginTop = role === "CIVIL" ? 0 : -30;
 
   return (
     <div ref={wordSectionRef} style={{ display: "grid", gap: 16 }}>
-      <h2>Mot secret</h2>
-      <WordCard word={displayedWord} />
       <div
         className="card"
         style={{ display: "grid", gap: 6, textAlign: "center", alignItems: "center", justifyItems: "center" }}
@@ -275,8 +273,23 @@ export default function WordRevealPage() {
             style={roleImageStyle}
           />
         )}
-        <strong style={{ marginTop: roleLabelMarginTop, marginBottom: 10 }}>{roleLabel}</strong>
+        <strong
+          style={{
+            marginTop: roleLabelMarginTop,
+            marginBottom: 12,
+            fontSize: 26,
+            lineHeight: 1.1,
+            letterSpacing: 0.2,
+          }}
+        >
+          {roleLabel}
+        </strong>
         <p style={{ margin: 0 }}>{roleDescription}</p>
+      </div>
+
+      <div style={{ display: "grid", gap: 8, padding: "12px 0 20px 0" }}>
+        <h2 style={{ textAlign: "center", margin: 0 }}>Ton mot secret</h2>
+        <WordCard word={displayedWord} />
       </div>
 
       <div className="card" style={{ display: "grid", gap: 8, padding: 12 }}>

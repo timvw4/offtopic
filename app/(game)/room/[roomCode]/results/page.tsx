@@ -360,15 +360,19 @@ export default function ResultsPage() {
     zIndex: 2,
   } as const;
 
+  // Si le Caméléon a été accusé correctement, on ne doit pas afficher d'égalité même si les votes sont ex æquo.
+  const wasAccusedCameleon = eliminated?.role === "CAMELEON" && result?.is_chameleon === false;
+
   // Fallback tie detection côté client (au cas où tie_player_ids n'est pas encore propagé).
   const computedTieIds = useMemo(() => {
+    if (wasAccusedCameleon) return [];
     if (tieIds.length > 0) return tieIds;
     if (maxVotes === 0) return [];
     const leaders = Object.entries(voteCounts)
       .filter(([, c]) => c === maxVotes)
       .map(([id]) => id);
     return leaders.length > 1 ? leaders : [];
-  }, [maxVotes, tieIds, voteCounts]);
+  }, [maxVotes, tieIds, voteCounts, wasAccusedCameleon]);
 
   const alivePlayers = players.filter((p) => !p.isEliminated);
   const horsThemeAlive = alivePlayers.filter((p) => p.role === "HORS_THEME").length;
@@ -392,7 +396,7 @@ export default function ResultsPage() {
       return "Caméléon gagne (éliminé sans accusation correcte)";
     }
     if (result?.is_chameleon === false && eliminated?.role === "CAMELEON") {
-      return "Caméléon perd (accusation correcte)";
+      return "Joueur éliminé";
     }
     if (horsThemeAlive === 0) {
       return "Civils gagnent (tous les Hors-Thème éliminés)";
@@ -412,9 +416,44 @@ export default function ResultsPage() {
         ? "Hors-Thème"
         : outcome === "Caméléon gagne (éliminé sans accusation correcte)"
           ? "Caméléon"
-          : outcome === "Caméléon perd (accusation correcte)"
+        : outcome === "Joueur éliminé"
             ? "Civils"
             : null;
+
+  // Style spécifique pour le message d'issue quand on affiche "Joueur éliminé".
+  const outcomeStyle = useMemo(() => {
+    return outcome === "Joueur éliminé" ? { color: "#f97316", fontWeight: 600 } : undefined;
+  }, [outcome]);
+
+  // Pour styliser les cartes gagnantes en fin de partie
+  const winningRoles = useMemo(() => {
+    if (!winnersLabel) return [];
+    if (winnersLabel === "Caméléon") return ["CAMELEON"];
+    if (winnersLabel === "Hors-Thème") return ["HORS_THEME"];
+    // Cas "Civils" : inclut CIVIL et DICTATOR qui est côté civils.
+    return ["CIVIL", "DICTATOR"];
+  }, [winnersLabel]);
+
+  // Quand le Caméléon est identifié, seuls les accusateurs sont gagnants visuellement.
+  const winningAccusers = useMemo(() => {
+    if (!(result?.is_chameleon === false && eliminated?.role === "CAMELEON")) return [];
+    return accusersByTarget[eliminated?.id || ""] || [];
+  }, [accusersByTarget, eliminated?.id, eliminated?.role, result?.is_chameleon]);
+
+  // Libellé d'en-tête pour les gagnants : on affiche le rôle gagnant (pas les pseudos).
+  const winnersNamesLabel = useMemo(() => {
+    return winnersLabel;
+  }, [winnersLabel]);
+
+  const winnerHeading = useMemo(() => {
+    if (winningAccusers.length > 0) {
+      const names = winningAccusers;
+      return names.length === 1 ? `${names[0]} a gagné` : `${names.join(", ")} ont gagné`;
+    }
+    const singular = winnersLabel === "Caméléon";
+    if (!winnersLabel) return "…";
+    return singular ? `Le ${winnersLabel} a gagné` : `Les ${winnersLabel} ont gagné`;
+  }, [winningAccusers, winnersLabel]);
 
   async function goToLobbyAndMaybeReset() {
     const room = params.roomCode;
@@ -508,13 +547,41 @@ export default function ResultsPage() {
           </div>
         ) : (
           <div className="card result-pop" style={{ display: "grid", gap: 8, justifyItems: "center", textAlign: "center" }}>
+            {eliminated.role === "CAMELEON" && (
+              <Image
+                src={asset("/roles/chameleon.png")}
+                alt="Rôle Caméléon"
+                width={190}
+                height={190}
+                style={{ marginTop: -12, marginBottom: -6, objectFit: "contain" }}
+              />
+            )}
+            {eliminated.role === "HORS_THEME" && (
+              <Image
+                src={asset("/roles/hors-theme.png")}
+                alt="Rôle Hors-Thème"
+                width={160}
+                height={160}
+                style={{ marginTop: -12, marginBottom: -20, objectFit: "contain" }}
+              />
+            )}
             <strong style={{ fontSize: 18 }}>{eliminated.nickname}</strong>
-            <p style={{ margin: 0 }}>Rôle révélé : {eliminated.role}</p>
+            <p style={{ margin: 0 }}>Rôle : {eliminated.role}</p>
+            <p style={{ margin: 0, color: "#f97316", fontWeight: 600 }}>Joueur éliminé</p>
             {result?.is_chameleon === true && <p style={{ margin: 0 }}>Le Caméléon a été éliminé → victoire Caméléon.</p>}
             {result?.is_chameleon === false && eliminated?.role === "CAMELEON" && (
-              <p style={{ margin: 0 }}>Caméléon identifié, il perd.</p>
+              <p style={{ margin: 0 }}>
+                Caméléon identifié
+                {accusersByTarget[eliminated.id]?.length
+                  ? ` par ${accusersByTarget[eliminated.id].join(", ")}`
+                  : ""}
+              </p>
             )}
-            {outcome && <p style={{ margin: 0 }}>{outcome}</p>}
+            {outcome && (
+              <p style={{ margin: 0, ...(outcomeStyle || {}) }}>
+                {outcome}
+              </p>
+            )}
           </div>
         )
       ) : (
@@ -528,7 +595,8 @@ export default function ResultsPage() {
           className="card result-pop"
           style={{ display: "grid", gap: 10, justifyItems: "center", textAlign: "center", padding: "16px 12px" }}
         >
-          <strong style={{ fontSize: 18, textTransform: "uppercase" }}>Partie terminée, les {winnersLabel} ont gagné</strong>
+          <strong style={{ fontSize: 18, textTransform: "uppercase" }}>Partie terminée</strong>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{winnerHeading}</span>
           <div
             style={{
               display: "grid",
@@ -537,7 +605,11 @@ export default function ResultsPage() {
               width: "100%",
             }}
           >
-            {players.map((p) => (
+            {players.map((p) => {
+              // Si Caméléon identifié : seuls les accusateurs sont gagnants. Sinon, on utilise les rôles gagnants.
+              const isWinnerCard =
+                winningAccusers.length > 0 ? winningAccusers.includes(p.nickname) : winningRoles.includes(p.role);
+              return (
               <div
                 key={p.id}
                 style={{
@@ -545,9 +617,9 @@ export default function ResultsPage() {
                   gap: 2, // rapproche l'image du nom
                   justifyItems: "center",
                   padding: 10,
-                  background: "rgba(255,255,255,0.03)",
+                  background: isWinnerCard ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.03)",
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  border: isWinnerCard ? "2px solid #22c55e" : "1px solid rgba(255,255,255,0.06)",
                 }}
               >
                 <Image
@@ -568,7 +640,8 @@ export default function ResultsPage() {
                 <span style={{ fontWeight: 700 }}>{p.nickname}</span>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{p.role}</span>
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}

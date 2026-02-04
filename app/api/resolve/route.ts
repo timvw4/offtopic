@@ -22,7 +22,9 @@ export async function POST(request: Request) {
   // Si on est déjà en RESULTS (rafraîchissement), on laisse passer sans bloquer.
   const { data: room } = await supabaseAdmin.from("rooms").select("current_phase").eq("code", roomCode).single();
   if (room?.current_phase !== "RESULTS") {
+    // Valide la transition puis force la phase en base pour éviter que les clients restent bloqués en VOTE.
     assertTransition(room?.current_phase || "VOTE", "RESULTS");
+    await supabaseAdmin.from("rooms").update({ current_phase: "RESULTS" }).eq("code", roomCode);
   }
 
   // Récupère les votes
@@ -33,6 +35,21 @@ export async function POST(request: Request) {
   if (votesErr) return NextResponse.json({ error: "Erreur votes" }, { status: 500 });
   if (!votes || votes.length === 0) {
     return NextResponse.json({ message: "Aucun vote" });
+  }
+
+  // Récupère les accusations pour détecter un Caméléon identifié même en cas d'égalité de votes.
+  const { data: accusationsRows } = await supabaseAdmin
+    .from("chameleon_accusations")
+    .select("target_player_id")
+    .eq("room_code", roomCode);
+  const accusedIds = Array.from(new Set((accusationsRows || []).map((a) => a.target_player_id)));
+  let accusedChameleonId: string | null = null;
+  if (accusedIds.length > 0) {
+    const { data: accusedPlayers } = await supabaseAdmin
+      .from("players")
+      .select("id, role")
+      .in("id", accusedIds);
+    accusedChameleonId = (accusedPlayers || []).find((p) => p.role === "CAMELEON")?.id ?? null;
   }
 
   // Comptage
@@ -55,8 +72,11 @@ export async function POST(request: Request) {
     });
   }
 
-  // Égalité → pas d’élimination, on force un revote entre ex æquo
-  if (leaders.length !== 1) {
+  // Si le Caméléon a été accusé correctement, il est éliminé même en cas d'égalité de votes.
+  const forcedAccusedElimination = !!accusedChameleonId;
+
+  // Égalité → pas d’élimination, sauf si accusation Caméléon correcte
+  if (!forcedAccusedElimination && leaders.length !== 1) {
     await supabaseAdmin
       .from("rounds")
       .update({ last_eliminated_player_id: null, last_eliminated_is_chameleon: null, tie_player_ids: leaders, dictator_survived: false })
@@ -64,7 +84,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ tie: true, tiePlayerIds: leaders, eliminated: null });
   }
 
-  const eliminatedId = leaders[0];
+  const eliminatedId = forcedAccusedElimination ? accusedChameleonId! : leaders[0];
 
   // Rôle du joueur ciblé
   const { data: player } = await supabaseAdmin
@@ -114,7 +134,7 @@ export async function POST(request: Request) {
     .eq("room_code", roomCode)
     .eq("target_player_id", eliminatedId)
     .limit(1);
-  const accused = !!accusations && accusations.length > 0;
+  const accused = forcedAccusedElimination || (!!accusations && accusations.length > 0);
 
   // Marque l’élimination du joueur
   await supabaseAdmin.from("players").update({ is_eliminated: true }).eq("id", eliminatedId);

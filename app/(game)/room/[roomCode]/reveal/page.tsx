@@ -36,6 +36,8 @@ export default function RevealPage() {
     supabaseClient
       .from("drawings")
       .select("id, nickname, data_url")
+      .order("nickname", { ascending: true })
+      .order("id", { ascending: true })
       .eq("room_code", room)
       .then(({ data }) => setDrawings((data as DrawingRow[]) || []));
 
@@ -91,6 +93,8 @@ export default function RevealPage() {
           supabaseClient
             .from("drawings")
             .select("id, nickname, data_url")
+            .order("nickname", { ascending: true })
+            .order("id", { ascending: true })
             .eq("room_code", room)
             .then(({ data }) => setDrawings((data as DrawingRow[]) || []));
         },
@@ -120,6 +124,8 @@ export default function RevealPage() {
       supabaseClient
         .from("drawings")
         .select("id, nickname, data_url")
+        .order("nickname", { ascending: true })
+        .order("id", { ascending: true })
         .eq("room_code", room)
         .then(({ data }) => setDrawings((data as DrawingRow[]) || []));
     }, 2000);

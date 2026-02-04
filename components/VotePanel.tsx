@@ -26,6 +26,23 @@ export function VotePanel({
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedAccuse, setSelectedAccuse] = useState<string | null>(null);
+  const getRoundInputStyle = (checked: boolean, disabled: boolean) => ({
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+    MozAppearance: "none" as const,
+    width: 22,
+    height: 22,
+    borderRadius: "50%",
+    border: "2px solid #f97316",
+    background: checked ? "#f97316" : "rgba(255,255,255,0.06)",
+    boxShadow: checked ? "0 0 0 3px rgba(249,115,22,0.35)" : "inset 0 0 0 1px rgba(255,255,255,0.12)",
+    display: "grid",
+    placeItems: "center",
+    cursor: disabled ? "not-allowed" : "pointer",
+    transition: "all 0.2s ease",
+    flexShrink: 0,
+    opacity: disabled ? 0.6 : 1,
+  });
 
   return (
     <div className="card" style={{ display: "grid", gap: 10, padding: 16 }}>
@@ -50,9 +67,9 @@ export function VotePanel({
               name="vote"
               value={p.id}
               checked={selected === p.id}
-                disabled={disableVote}
-                onChange={() => setSelected(p.id)}
-              style={{ accentColor: "#ffffff", width: 18, height: 18 }}
+              disabled={disableVote}
+              onChange={() => setSelected(p.id)}
+              style={getRoundInputStyle(selected === p.id, disableVote)}
             />
             <span style={{ fontWeight: 600 }}>{p.nickname}</span>
           </label>

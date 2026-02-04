@@ -103,7 +103,7 @@ export default function HomePage() {
           flex: 1,
         }}
       >
-        <div style={{ display: "grid", gap: 10, textAlign: "center", marginTop: -12 }}>
+        <div style={{ display: "grid", gap: 10, textAlign: "center", marginTop: 25 }}>
           <div
             style={{
               justifySelf: "center",
@@ -126,7 +126,7 @@ export default function HomePage() {
             width: "100%",
             maxWidth: 520,
             justifySelf: "center",
-            marginTop: -24,
+            marginTop: 12,
             alignSelf: "center",
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateY(0px)" : "translateY(18px)",

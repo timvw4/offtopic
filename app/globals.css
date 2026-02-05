@@ -293,11 +293,13 @@ video {
   .panel {
     width: 100%;
     padding: 12px;
+    margin-inline: 4px; /* évite que les panneaux collent aux bords */
   }
 
   .card {
-    padding: 14px;
+    padding: 12px;
     border-radius: 12px;
+    margin-inline: 4px; /* espace latéral supplémentaire sur mobile */
   }
 
   /* Dessin : contrôles plus compacts et palette réduite */

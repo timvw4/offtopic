@@ -260,13 +260,17 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   );
 
   return (
-    <div className="card" style={{ display: "grid", gap: 12, padding: 18 }} ref={containerRef}>
-      <div className="panel" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+    <div className="card drawing-card" style={{ display: "grid", gap: 12, padding: 18 }} ref={containerRef}>
+      <div
+        className="panel drawing-controls"
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
+      >
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-start" }}>
-        {colors.map((c) => (
-          <button
-            key={c}
+          {colors.map((c) => (
+            <button
+              key={c}
               type="button"
+              className="color-swatch"
               style={{
                 background: c,
                 color: "transparent",
@@ -286,12 +290,12 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
                 border: "2px solid rgba(255,255,255,0.35)",
                 boxShadow: brushColor === c ? "0 0 0 3px rgba(250,204,21,0.5)" : "none",
               }}
-            onClick={() => setBrushColor(c)}
-            aria-label={`Choisir la couleur ${c}`}
-          >
+              onClick={() => setBrushColor(c)}
+              aria-label={`Choisir la couleur ${c}`}
+            >
               {/* pastille */}
-          </button>
-        ))}
+            </button>
+          ))}
         </div>
         <label style={{ color: "var(--text)", display: "grid", gap: 4, textAlign: "center" }}>
           <span style={{ fontWeight: 600, fontSize: 14, justifySelf: "center" }}>Taille</span>

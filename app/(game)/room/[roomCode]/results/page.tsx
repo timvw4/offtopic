@@ -592,12 +592,13 @@ export default function ResultsPage() {
 
       {gameEnded && winnersLabel && (
         <div
-          className="card result-pop"
+          className="card result-pop results-summary"
           style={{ display: "grid", gap: 10, justifyItems: "center", textAlign: "center", padding: "16px 12px" }}
         >
           <strong style={{ fontSize: 18, textTransform: "uppercase" }}>Partie terminée</strong>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{winnerHeading}</span>
           <div
+            className="results-winners-grid"
             style={{
               display: "grid",
               gap: 10,

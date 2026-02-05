@@ -280,14 +280,69 @@ video {
 /* Ajustements mobiles : moins de padding et boutons empilés */
 @media (max-width: 640px) {
   .app-shell {
-    padding: 18px 14px 60px;
+    padding: 20px 16px 60px; /* évite que les cartes collent aux bords */
   }
 
   .btn-compact {
     width: 100%;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 12px;
   }
 
   .panel {
     width: 100%;
+    padding: 12px;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  /* Dessin : contrôles plus compacts et palette réduite */
+  .drawing-card {
+    gap: 10px;
+  }
+
+  .drawing-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .drawing-controls .color-swatch {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border-width: 1.5px;
+  }
+
+  .drawing-controls .size-slider {
+    width: 120px;
+  }
+
+  .drawing-card canvas {
+    max-height: 70vh;
+  }
+
+  /* Résultats : texte et cartes gagnants plus petits */
+  .results-summary strong {
+    font-size: 16px !important;
+  }
+
+  .results-summary span {
+    font-size: 14px !important;
+  }
+
+  .results-winners-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .results-winners-grid img {
+    width: 64px !important;
+    height: 64px !important;
   }
 }

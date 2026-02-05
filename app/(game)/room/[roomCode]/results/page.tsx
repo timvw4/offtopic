@@ -54,6 +54,7 @@ export default function ResultsPage() {
   const [tieIds, setTieIds] = useState<string[]>([]);
   const [accusations, setAccusations] = useState<ChameleonAccusationRow[]>([]);
   const [visibleTooltipPlayerId, setVisibleTooltipPlayerId] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   const tooltipTimeout = useRef<NodeJS.Timeout | null>(null);
   const resolvedRef = useRef(false);
 
@@ -445,15 +446,48 @@ export default function ResultsPage() {
     return winnersLabel;
   }, [winnersLabel]);
 
-  const winnerHeading = useMemo(() => {
+  const winnerHeadingNode = useMemo(() => {
     if (winningAccusers.length > 0) {
       const names = winningAccusers;
       return names.length === 1 ? `${names[0]} a gagné` : `${names.join(", ")} ont gagné`;
     }
-    const singular = winnersLabel === "Caméléon";
     if (!winnersLabel) return "…";
-    return singular ? `Le ${winnersLabel} a gagné` : `Les ${winnersLabel} ont gagné`;
+    const singular = winnersLabel === "Caméléon";
+    const roleLabel = <span className="winner-role-bling">{winnersLabel}</span>;
+    return (
+      <>
+        {singular ? "Le " : "Les "}
+        {roleLabel}
+        {singular ? " a gagné" : " ont gagné"}
+      </>
+    );
   }, [winningAccusers, winnersLabel]);
+
+  // Confettis affichés en fin de partie
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 28 }).map((_, i) => ({
+        left: (i * 7 + (i % 3) * 5) % 100,
+        delay: (i % 10) * 0.18,
+        duration: 4 + (i % 5) * 0.35,
+        color: ["#facc15", "#22c55e", "#38bdf8", "#f97316", "#a855f7"][i % 5],
+      })),
+    [],
+  );
+
+  // Confettis visibles pendant 6s, puis on laisse finir la dernière chute avant de masquer la couche
+  useEffect(() => {
+    if (!gameEnded || !winnersLabel) {
+      setShowConfetti(false);
+      return;
+    }
+    setShowConfetti(true);
+    const maxDelay = confettiPieces.reduce((m, c) => Math.max(m, c.delay), 0);
+    const maxDuration = confettiPieces.reduce((m, c) => Math.max(m, c.duration), 0);
+    const hideAfterMs = (5 + maxDelay + maxDuration) * 1000;
+    const id = setTimeout(() => setShowConfetti(false), hideAfterMs);
+    return () => clearTimeout(id);
+  }, [confettiPieces, gameEnded, winnersLabel]);
 
   async function goToLobbyAndMaybeReset() {
     const room = params.roomCode;
@@ -534,8 +568,8 @@ export default function ResultsPage() {
             <Image
               src="/roles/civil.png"
               alt="Rôle Civil"
-              width={190}
-              height={190}
+              width={110}
+              height={110}
               style={{ marginTop: -20, marginBottom: -12 }} // laisse plus d'espace avant le nom du rôle
             />
             <div style={{ display: "grid", gap: 4 }}>
@@ -560,8 +594,8 @@ export default function ResultsPage() {
               <Image
                 src={asset("/roles/hors-theme.png")}
                 alt="Rôle Hors-Thème"
-                width={160}
-                height={160}
+                width={120}
+                height={120}
                 style={{ marginTop: -12, marginBottom: -20, objectFit: "contain" }}
               />
             )}
@@ -591,12 +625,31 @@ export default function ResultsPage() {
       )}
 
       {gameEnded && winnersLabel && (
+        <>
+          {showConfetti && (
+            <div className="confetti-layer" aria-hidden="true">
+              {confettiPieces.map((c, i) => (
+                <span
+                  key={`confetti-${i}`}
+                  className="confetti-piece"
+                  style={
+                    {
+                      "--left": `${c.left}%`,
+                      "--delay": `${c.delay}s`,
+                      "--duration": `${c.duration}s`,
+                      backgroundColor: c.color,
+                    } as React.CSSProperties
+                  }
+                />
+              ))}
+            </div>
+          )}
         <div
           className="card result-pop results-summary"
           style={{ display: "grid", gap: 10, justifyItems: "center", textAlign: "center", padding: "16px 12px" }}
         >
           <strong style={{ fontSize: 18, textTransform: "uppercase" }}>Partie terminée</strong>
-          <span style={{ fontSize: 16, fontWeight: 600 }}>{winnerHeading}</span>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{winnerHeadingNode}</span>
           <div
             className="results-winners-grid"
             style={{
@@ -645,6 +698,7 @@ export default function ResultsPage() {
             })}
           </div>
         </div>
+        </>
       )}
 
       <div className="card">

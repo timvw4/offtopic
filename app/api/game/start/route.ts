@@ -95,6 +95,11 @@ export async function POST(request: Request) {
     ? effective.drawing_timer_seconds
     : 60;
 
+  // Au lancement, on marque tous les joueurs comme sortis du lobby pour que
+  // l'indicateur "tout le monde est revenu" ne se déclenche que lorsqu'ils cliquent
+  // réellement sur "Retour au lobby".
+  await supabaseAdmin.from("players").update({ is_in_lobby: false }).eq("room_code", roomCode);
+
   // Purge des données du tour précédent (dessins, votes, accusations) pour éviter les fuites entre manches.
   await Promise.all([
     supabaseAdmin.from("drawings").delete().eq("room_code", roomCode),

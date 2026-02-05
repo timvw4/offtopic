@@ -22,13 +22,15 @@ const colors = [
   "#9ca3af", // gris
   "#8b4513", // brun
   "#ef4444", // rouge
-  "#22c55e", // vert (unique)
-  "#1d4ed8", // bleu foncé (plus sombre)
+  "#22c55e", // vert
+  "#1d4ed8", // bleu foncé
   "#a855f7", // violet
   "#f59e0b", // orange
   "#0ea5e9", // bleu clair
   "#ec4899", // rose
-  "#facc15", // jaune (nouvelle couleur)
+  "#facc15", // jaune
+  "#06b6d4", // cyan
+  "#84cc16", // vert lime
 ];
 
 export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function DrawingCanvas(
@@ -308,49 +310,51 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
             onChange={(e) => setBrushSize(Number(e.target.value))}
           />
         </label>
-        <button
-          type="button"
-          className="btn btn-compact btn-ghost"
-          onClick={undo}
-          disabled={disabled || strokes.length === 0}
-          aria-label="Annuler le dernier trait"
-          title="Annuler le dernier trait"
-        >
-          ←
-        </button>
-        <button
-          type="button"
-          className="btn btn-compact btn-ghost"
-          onClick={redo}
-          disabled={disabled || redoStrokes.length === 0}
-          aria-label="Rétablir le trait annulé"
-          title="Rétablir le trait annulé"
-        >
-          →
-        </button>
-        <button
-          type="button"
-          className="btn btn-compact"
-          aria-pressed={fillMode}
-          onClick={() => setFillMode((v) => !v)}
-          style={{
-            background: fillMode ? "rgba(250, 204, 21, 0.54)" : undefined,
-            border: fillMode ? "1px solid rgba(250,204,21,0.6)" : undefined,
-          }}
-          title="Pot de peinture (remplir une zone)"
-        >
-          <Image
-            src="/bucket.png"
-            alt=""
-            aria-hidden="true"
-            width={18}
-            height={18}
-            style={{ display: "block", objectFit: "contain" }}
-          />
-        </button>
-        <button type="button" className="btn btn-compact" onClick={exportImage} disabled={disabled}>
-          Valider
-        </button>
+        <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", alignItems: "center" }}>
+          <button
+            type="button"
+            className="btn btn-compact btn-ghost"
+            onClick={undo}
+            disabled={disabled || strokes.length === 0}
+            aria-label="Annuler le dernier trait"
+            title="Annuler le dernier trait"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            className="btn btn-compact btn-ghost"
+            onClick={redo}
+            disabled={disabled || redoStrokes.length === 0}
+            aria-label="Rétablir le trait annulé"
+            title="Rétablir le trait annulé"
+          >
+            →
+          </button>
+          <button
+            type="button"
+            className="btn btn-compact"
+            aria-pressed={fillMode}
+            onClick={() => setFillMode((v) => !v)}
+            style={{
+              background: fillMode ? "rgba(250, 204, 21, 0.54)" : undefined,
+              border: fillMode ? "1px solid rgba(250,204,21,0.6)" : undefined,
+            }}
+            title="Pot de peinture (remplir une zone)"
+          >
+            <Image
+              src="/bucket.png"
+              alt=""
+              aria-hidden="true"
+              width={18}
+              height={18}
+              style={{ display: "block", objectFit: "contain" }}
+            />
+          </button>
+          <button type="button" className="btn btn-compact" onClick={exportImage} disabled={disabled}>
+            Valider
+          </button>
+        </div>
       </div>
       <canvas
         ref={canvasRef}

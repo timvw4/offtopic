@@ -97,7 +97,8 @@ export default function DrawPage() {
 
     // Première valeur visuelle : on ajoute +1 s'il ne reste que 1-2s à cause du réseau pour afficher "3"
     const initialDiff = Math.max(0, Math.ceil((target - Date.now()) / 1000));
-    const visualInitial = initialDiff > 0 && initialDiff < 3 ? initialDiff + 1 : initialDiff;
+    // Affiche 4 au début (au lieu de 3) pour un pré-compte plus lisible, puis décale légèrement les petites valeurs
+    const visualInitial = initialDiff > 0 && initialDiff < 4 ? initialDiff + 1 : initialDiff;
     setCountdown(visualInitial);
 
     const tick = () => {

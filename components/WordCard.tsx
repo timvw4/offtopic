@@ -14,9 +14,10 @@ export function WordCard({ word }: Props) {
         color: "#facc15",
         border: "2px solid #facc15",
         boxShadow: "none",
+        padding: "10px 12px",
       }}
     >
-      <p style={{ fontSize: 32, fontWeight: 800 }}>{word}</p>
+      <p style={{ fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, margin: 0 }}>{word}</p>
     </div>
   );
 }

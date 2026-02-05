@@ -58,6 +58,8 @@ export default function LobbyPage() {
   const [showCamTooltip, setShowCamTooltip] = useState(false);
   const [showDictTooltip, setShowDictTooltip] = useState(false);
   const [showRolesList, setShowRolesList] = useState(false);
+  const [showHostParams, setShowHostParams] = useState(false);
+  const [showPlayerParams, setShowPlayerParams] = useState(true);
   const [joinError, setJoinError] = useState<string | null>(null);
   // Empêche deux appels concurrents à init (évite le faux positif "pseudo déjà utilisé")
   const initLockRef = useRef(false);
@@ -137,13 +139,6 @@ export default function LobbyPage() {
 
         if (existingPlayerError) {
           setJoinError("Impossible de vérifier ton pseudo pour cette salle. Réessaie dans un instant.");
-          return;
-        }
-
-        const isSameBrowser = existingPlayer && storedPlayerId && existingPlayer.id === storedPlayerId;
-        const isGhost = existingPlayer?.is_in_lobby === false;
-        if (existingPlayer && !isSameBrowser && !isGhost) {
-          setJoinError("Ce pseudo est déjà utilisé dans cette salle. Choisis-en un autre pour rejoindre.");
           return;
         }
 
@@ -391,229 +386,242 @@ export default function LobbyPage() {
           className="card"
           style={{ display: "grid", gap: 10, border: "1px solid #87ceeb" /* contour bleu clair */ }}
         >
-          <h4 style={{ color: "#87ceeb" /* bleu ciel lisible */ }}>Paramètres de rôle (Hôte)</h4>
-          <label style={{ display: "grid", gap: 6 }}>
-            Thème des mots
-            <select
-              className="input"
-              value={selectedTheme}
-              onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.value)}
-            >
-              {themes.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "grid", gap: 6 }}>
-            Hors-Thème
-            {hasSingleHtOption ? (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(255,255,255,0.16)",
-                  background: "rgba(255,255,255,0.04)",
-                  fontWeight: 600,
-                  color: "rgba(255,255,255,0.72)",
-                }}
-              >
-                {htDisplay}
-              </div>
-            ) : (
-              <select
-                className="input"
-                value={selectedHt}
-                onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedTheme)}
-              >
-                {options.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt} Hors-Thème
-                  </option>
-                ))}
-              </select>
-            )}
-          </label>
           <button
             type="button"
             className="btn btn-compact btn-ghost"
-            style={{
-              border: "1.5px solid #87ceeb" /* contour bleu clair */,
-              color: "#fff",
-              background: "rgba(0, 0, 0, 0.82)",
-              position: "relative",
-              overflow: "hidden",
-              height: 64,
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textAlign: "center",
-            }}
-            onClick={() => setShowRolesList((v) => !v)}
+            onClick={() => setShowHostParams((v) => !v)}
+            style={{ justifyContent: "space-between", width: "100%", padding: "10px 12px", color: "#ffffff" }}
           >
-            <Image
-              src="/roles.png"
-              alt="Illustration des rôles"
-              fill
-              sizes="320px"
-              style={{ objectFit: "cover", opacity: 0.8 }}
-              priority
-            />
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: "rgba(0,0,0,0.5)",
-                zIndex: 1,
-                pointerEvents: "none",
-              }}
-            />
-            <span
-              style={{
-                position: "relative",
-                zIndex: 2,
-                fontWeight: 700,
-                fontSize: 22,
-                textShadow: "0 2px 6px rgba(0, 0, 0, 0.35)",
-              }}
-            >
-              Ajoute des rôles
-            </span>
+            <span style={{ fontWeight: 700 }}>Paramètres de rôle (Hôte)</span>
+            <span aria-hidden="true">{showHostParams ? "▲" : "▼"}</span>
           </button>
-          {showRolesList && (
-            <div
-              style={{
-                display: "grid",
-                gap: 8,
-                padding: 10,
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 10,
-                background: "rgba(255,255,255,0.04)",
-              }}
-            >
-              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input
-                  type="checkbox"
-                  checked={selectedCam}
-                  style={getRoleCheckboxStyle(selectedCam)}
-                  onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
-                />
-                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      Caméléon
-                      <button
-                        type="button"
-                        className="tooltip-icon"
-                        aria-label="Infos Caméléon"
-                        onClick={() => setShowCamTooltip((v) => !v)}
-                      >
-                        i
-                      </button>
-                      {showCamTooltip && (
-                        <div className="tooltip-content">
-                          Le Caméléon reçoit le même mot que les civils, mais il joue seul contre tous.
-                          Son objectif est de se faire éliminer en se faisant passer pour un joueur Hors-Thème, sans jamais être démasqué comme Caméléon. Si le Caméléon est correctement accusé, il est éliminé et perd immédiatement.
-                        </div>
-                      )}
-                    </span>
-                  </div>
-                  <small style={{ color: "var(--muted)" }}>
-                    Le Caméléon connaît le mot mais doit se faire passer pour un joueur Hors-Thème sans se faire démasquer.
-                  </small>
-                </div>
+
+          {showHostParams && (
+            <>
+              <label style={{ display: "grid", gap: 6 }}>
+                Thème des mots
+                <select
+                  className="input"
+                  value={selectedTheme}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.value)}
+                >
+                  {themes.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
-              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input
-                  type="checkbox"
-                  checked={selectedDict}
-                  style={getRoleCheckboxStyle(selectedDict)}
-                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
-                />
-                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      Dictateur
-                      <button
-                        type="button"
-                        className="tooltip-icon"
-                        aria-label="Infos Dictateur"
-                        onClick={() => setShowDictTooltip((v) => !v)}
-                      >
-                        i
-                      </button>
-                      {showDictTooltip && (
-                        <div className="tooltip-content">
-                          Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
-                          Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
-                        </div>
-                      )}
-                    </span>
+              <label style={{ display: "grid", gap: 6 }}>
+                Hors-Thème
+                {hasSingleHtOption ? (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.16)",
+                      background: "rgba(255,255,255,0.04)",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.72)",
+                    }}
+                  >
+                    {htDisplay}
                   </div>
-                  <small style={{ color: "var(--muted)" }}>
-                    Si la majorité vote contre lui une première fois, il survit et son prochain vote compte double.
-                  </small>
-                </div>
+                ) : (
+                  <select
+                    className="input"
+                    value={selectedHt}
+                    onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedTheme)}
+                  >
+                    {options.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt} Hors-Thème
+                      </option>
+                    ))}
+                  </select>
+                )}
               </label>
-              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
-            </div>
-          )}
-          {(selectedCam || selectedDict) && (
-            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "6px 2px" }}>
-              {selectedCam && (
+              <label style={{ display: "grid", gap: 6 }}>
+                Durée du dessin
+                <select
+                  className="input"
+                  value={settings.drawing_timer_seconds ?? 60}
+                  onChange={(e) => updateTimer(Number(e.target.value))}
+                >
+                  {[30, 45, 60, 90, 120].map((s) => (
+                    <option key={s} value={s}>
+                      {s} secondes
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn btn-compact btn-ghost"
+                style={{
+                  border: "1.5px solid rgb(128, 128, 128)" /* contour bleu clair */,
+                  color: "#fff",
+                  background: "rgba(0, 0, 0, 0.82)",
+                  position: "relative",
+                  overflow: "hidden",
+                  height: 64,
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                }}
+                onClick={() => setShowRolesList((v) => !v)}
+              >
+                <Image
+                  src="/roles.png"
+                  alt="Illustration des rôles"
+                  fill
+                  sizes="320px"
+                  style={{ objectFit: "cover", opacity: 0.8 }}
+                  priority
+                />
                 <div
+                  aria-hidden
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    padding: "6px 10px",
-                    borderRadius: 10,
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.12)",
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(0,0,0,0.5)",
+                    zIndex: 1,
+                    pointerEvents: "none",
+                  }}
+                />
+                <span
+                  style={{
+                    position: "relative",
+                    zIndex: 2,
+                    fontWeight: 700,
+                    fontSize: 22,
+                    textShadow: "0 2px 6px rgba(0, 0, 0, 0.35)",
                   }}
                 >
-                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={48} height={48} />
-                </div>
-              )}
-              {selectedDict && (
+                  Ajoute des rôles
+                </span>
+              </button>
+              {showRolesList && (
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    padding: "6px 10px",
-                    borderRadius: 10,
-                    background: "rgba(255,255,255,0.05)",
+                    display: "grid",
+                    gap: 8,
+                    padding: 10,
                     border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,0.04)",
                   }}
                 >
-                  <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={48} height={48} />
+                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedCam}
+                      style={getRoleCheckboxStyle(selectedCam)}
+                      onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
+                    />
+                    <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          Caméléon
+                          <button
+                            type="button"
+                            className="tooltip-icon"
+                            aria-label="Infos Caméléon"
+                            onClick={() => setShowCamTooltip((v) => !v)}
+                          >
+                            i
+                          </button>
+                          {showCamTooltip && (
+                            <div className="tooltip-content">
+                              Le Caméléon reçoit le même mot que les civils, mais il joue seul contre tous.
+                              Son objectif est de se faire éliminer en se faisant passer pour un joueur Hors-Thème, sans jamais être démasqué comme Caméléon. Si le Caméléon est correctement accusé, il est éliminé et perd immédiatement.
+                            </div>
+                          )}
+                        </span>
+                      </div>
+                      <small style={{ color: "var(--muted)" }}>
+                        Le Caméléon connaît le mot mais doit se faire passer pour un joueur Hors-Thème sans se faire démasquer.
+                      </small>
+                    </div>
+                  </label>
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
+                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedDict}
+                      style={getRoleCheckboxStyle(selectedDict)}
+                      onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
+                    />
+                    <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          Dictateur
+                          <button
+                            type="button"
+                            className="tooltip-icon"
+                            aria-label="Infos Dictateur"
+                            onClick={() => setShowDictTooltip((v) => !v)}
+                          >
+                            i
+                          </button>
+                          {showDictTooltip && (
+                            <div className="tooltip-content">
+                              Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
+                              Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
+                            </div>
+                          )}
+                        </span>
+                      </div>
+                      <small style={{ color: "var(--muted)" }}>
+                        Si la majorité vote contre lui une première fois, il survit et son prochain vote compte double.
+                      </small>
+                    </div>
+                  </label>
+                  <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
                 </div>
               )}
-            </div>
+              {(selectedCam || selectedDict) && (
+                <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "6px 2px" }}>
+                  {selectedCam && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        padding: "6px 10px",
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                      }}
+                    >
+                      <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={48} height={48} />
+                    </div>
+                  )}
+                  {selectedDict && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        padding: "6px 10px",
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                      }}
+                    >
+                      <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={48} height={48} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
-          <label style={{ display: "grid", gap: 6 }}>
-            Durée du dessin
-            <select
-              className="input"
-              value={settings.drawing_timer_seconds ?? 60}
-              onChange={(e) => updateTimer(Number(e.target.value))}
-            >
-              {[30, 45, 60, 90, 120].map((s) => (
-                <option key={s} value={s}>
-                  {s} secondes
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       )}
 
@@ -622,95 +630,106 @@ export default function LobbyPage() {
           className="card"
           style={{ display: "grid", gap: 10, border: "1px solid rgba(255,255,255,0.2)" }}
         >
-          <h4 style={{ color: "rgba(255,255,255,0.8)" }}>Paramètres de la partie</h4>
-          <div style={{ display: "grid", gap: 8 }}>
-            <div>
-              <strong>Thème :</strong>{" "}
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "3px 8px",
-                  borderRadius: 8,
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#e5e7eb",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                }}
-              >
-                {themeLabel}
-              </span>
-            </div>
-            <div>
-              <strong>Hors-Thème :</strong>{" "}
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "3px 8px",
-                  borderRadius: 8,
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#e5e7eb",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                }}
-              >
-                {htDisplay}
-              </span>
-            </div>
-            <div>
-              <strong>Durée du dessin :</strong>{" "}
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "3px 8px",
-                  borderRadius: 8,
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#e5e7eb",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                }}
-              >
-                {settings.drawing_timer_seconds ?? 60} secondes
-              </span>
-            </div>
-            <div style={{ display: "grid", gap: 6 }}>
-              <strong>Rôles activés :</strong>
-              {selectedCam || selectedDict ? (
-                <div
+          <button
+            type="button"
+            className="btn btn-compact btn-ghost"
+            onClick={() => setShowPlayerParams((v) => !v)}
+            style={{ justifyContent: "space-between", width: "100%", padding: "10px 12px", color: "rgba(255,255,255,0.8)" }}
+          >
+            <span style={{ fontWeight: 700 }}>Paramètres de la partie</span>
+            <span aria-hidden="true">{showPlayerParams ? "▲" : "▼"}</span>
+          </button>
+
+          {showPlayerParams && (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div>
+                <strong>Thème :</strong>{" "}
+                <span
                   style={{
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    justifyContent: "flex-start",
+                    display: "inline-block",
+                    padding: "3px 8px",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e5e7eb",
+                    border: "1px solid rgba(255,255,255,0.18)",
                   }}
                 >
-                  {selectedCam && (
-                    <div
-                      style={{
-                    display: "grid",
-                    justifyItems: "center",
-                    gap: 4,
-                      }}
-                    >
-                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={64} height={64} />
-                  <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Caméléon</span>
-                    </div>
-                  )}
-                  {selectedDict && (
-                    <div
-                      style={{
-                    display: "grid",
-                    justifyItems: "center",
-                    gap: 4,
-                      }}
-                    >
-                  <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={64} height={64} />
-                  <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Dictateur</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>Aucun rôle spécial</span>
-              )}
+                  {themeLabel}
+                </span>
+              </div>
+              <div>
+                <strong>Hors-Thème :</strong>{" "}
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "3px 8px",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e5e7eb",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                  }}
+                >
+                  {htDisplay}
+                </span>
+              </div>
+              <div>
+                <strong>Durée du dessin :</strong>{" "}
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "3px 8px",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e5e7eb",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                  }}
+                >
+                  {settings.drawing_timer_seconds ?? 60} secondes
+                </span>
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <strong>Rôles activés :</strong>
+                {selectedCam || selectedDict ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      justifyContent: "flex-start",
+                    }}
+                  >
+                    {selectedCam && (
+                      <div
+                        style={{
+                          display: "grid",
+                          justifyItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={64} height={64} />
+                        <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Caméléon</span>
+                      </div>
+                    )}
+                    {selectedDict && (
+                      <div
+                        style={{
+                          display: "grid",
+                          justifyItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={64} height={64} />
+                        <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Dictateur</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>Aucun rôle spécial</span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

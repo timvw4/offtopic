@@ -77,6 +77,10 @@ export async function POST(request: Request) {
     ? effective.drawing_timer_seconds
     : 60;
 
+  // On quitte explicitement le lobby pour ce nouveau tour afin que le reset ne
+  // se déclenche que lorsque tout le monde aura cliqué sur "Retour au lobby".
+  await supabaseAdmin.from("players").update({ is_in_lobby: false }).eq("room_code", roomCode);
+
   // Purge des données de manche précédente pour ne pas mélanger les écrans,
   // mais on conserve les flags d'élimination et les rôles/words (pas de redistribution).
   await Promise.all([

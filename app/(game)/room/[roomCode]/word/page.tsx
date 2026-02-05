@@ -249,12 +249,13 @@ export default function WordRevealPage() {
           : dataLoaded && role === "CIVIL"
             ? { src: asset("/roles/civil.png"), alt: "Civil" }
             : null;
-  const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 190 : 190;
+  // Images et titres légèrement réduits pour Civil / Hors-Thème (plus lisible sur mobile)
+  const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 130 : 170;
   const roleImageStyle = {
     objectFit: "contain",
     filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))",
     marginTop: -10,
-    marginBottom: role === "CIVIL" ? -7 : 0, // décale le titre vers le bas pour Civil
+    marginBottom: role === "HORS_THEME" ? 6 : role === "CIVIL" ? -12 : 0, // espace texte/image pour H-T, léger ajustement civil
   } as const;
   const roleLabelMarginTop = role === "CIVIL" ? 0 : -30;
 
@@ -277,7 +278,7 @@ export default function WordRevealPage() {
           style={{
             marginTop: roleLabelMarginTop,
             marginBottom: 12,
-            fontSize: 26,
+            fontSize: role === "HORS_THEME" || role === "CIVIL" ? 22 : 26,
             lineHeight: 1.1,
             letterSpacing: 0.2,
           }}
@@ -287,8 +288,8 @@ export default function WordRevealPage() {
         <p style={{ margin: 0 }}>{roleDescription}</p>
       </div>
 
-      <div style={{ display: "grid", gap: 8, padding: "12px 0 20px 0" }}>
-        <h2 style={{ textAlign: "center", margin: 0 }}>Ton mot secret</h2>
+      <div style={{ display: "grid", gap: 6, padding: "8px 0 14px 0" }}>
+        <h2 style={{ textAlign: "center", margin: 0, fontSize: 18 }}>Ton mot secret</h2>
         <WordCard word={displayedWord} />
       </div>
 

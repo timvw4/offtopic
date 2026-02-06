@@ -392,7 +392,7 @@ export default function LobbyPage() {
             onClick={() => setShowHostParams((v) => !v)}
             style={{ justifyContent: "space-between", width: "100%", padding: "10px 12px", color: "#ffffff" }}
           >
-            <span style={{ fontWeight: 700 }}>Paramètres de rôle (Hôte)</span>
+            <span style={{ fontWeight: 700 }}>Paramètres</span>
             <span aria-hidden="true">{showHostParams ? "▲" : "▼"}</span>
           </button>
 

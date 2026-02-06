@@ -43,6 +43,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
         />
+        {/* Favicon / icône d'écran d'accueil */}
+        <link rel="icon" href="/icon.png" />
+        <link rel="apple-touch-icon" href="/icon.png" />
       </head>
       <body>
         <AmbientAudioProvider showFloatingButton={isHome} placement={isHome ? "top" : "bottom"}>

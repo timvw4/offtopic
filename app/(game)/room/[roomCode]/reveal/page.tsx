@@ -25,6 +25,7 @@ export default function RevealPage() {
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [revealReady, setRevealReady] = useState(false);
+  const [isDuelMode, setIsDuelMode] = useState(false);
 
   useEffect(() => {
     const room = params.roomCode;
@@ -71,12 +72,13 @@ export default function RevealPage() {
 
     supabaseClient
       .from("rooms")
-      .select("host_nickname, current_phase")
+      .select("host_nickname, current_phase, is_duel_mode")
       .eq("code", room)
       .maybeSingle()
       .then(({ data }) => {
         setHost(data?.host_nickname || null);
         setPhase(data?.current_phase || null);
+        setIsDuelMode(!!data?.is_duel_mode);
       });
 
     channel = supabaseClient
@@ -194,11 +196,16 @@ export default function RevealPage() {
   }, [isHost, params.roomCode, phase]);
 
   // Redirige tout le monde quand la phase passe à VOTE
+  // En mode Duel → on va sur /guess au lieu de /vote
   useEffect(() => {
     if (phase === "VOTE") {
-      router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
+      if (isDuelMode) {
+        router.replace(`/room/${params.roomCode}/guess?nickname=${encodeURIComponent(nickname)}`);
+      } else {
+        router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
+      }
     }
-  }, [phase, nickname, params.roomCode, router]);
+  }, [phase, nickname, params.roomCode, router, isDuelMode]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 500);
@@ -310,6 +317,7 @@ export default function RevealPage() {
           style={{ opacity: revealUnlocked ? 1 : 0.5 }}
           onClick={async () => {
             // Met à jour la phase pour synchroniser tous les joueurs
+            // En mode Duel, la phase passe à VOTE mais la redirection va vers /guess
             const resp = await fetch("/api/phase/vote", {
               method: "POST",
               body: JSON.stringify({ roomCode: params.roomCode }),
@@ -319,10 +327,10 @@ export default function RevealPage() {
             }
           }}
         >
-          Passer au vote
+          {isDuelMode ? "⚔️ Passer à la devinette" : "Passer au vote"}
         </button>
       ) : (
-        <p>En attente de l&apos;hôte pour passer au vote…</p>
+        <p>En attente de l&apos;hôte pour {isDuelMode ? "passer à la devinette" : "passer au vote"}…</p>
       )}
       {!revealUnlocked && (
         <p>

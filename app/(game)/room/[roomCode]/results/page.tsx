@@ -57,6 +57,9 @@ export default function ResultsPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [wordCivil, setWordCivil] = useState<string>("");
   const [wordHorsTheme, setWordHorsTheme] = useState<string>("");
+  // Mode Duel
+  const [isDuelMode, setIsDuelMode] = useState(false);
+  const [duelGuesses, setDuelGuesses] = useState<{ player_nickname: string; guessed_word: string; is_correct: boolean }[]>([]);
   // Une fois la partie terminée, on verrouille cet état pour qu'aucune mise à jour
   // temps réel (ex : un joueur qui rejoint le lobby et réinitialise is_eliminated)
   // ne fasse disparaître le bouton "Retour au lobby" pour les autres joueurs.
@@ -140,10 +143,19 @@ export default function ResultsPage() {
 
     supabaseClient
       .from("rooms")
-      .select("current_phase")
+      .select("current_phase, is_duel_mode")
       .eq("code", room)
       .maybeSingle()
-      .then(({ data }) => setPhase(data?.current_phase ?? null));
+      .then(({ data }) => {
+        setPhase(data?.current_phase ?? null);
+        setIsDuelMode(!!data?.is_duel_mode);
+      });
+
+    supabaseClient
+      .from("duel_guesses")
+      .select("player_nickname, guessed_word, is_correct")
+      .eq("room_code", room)
+      .then(({ data }) => setDuelGuesses((data as any[]) || []));
 
     // Fonctions partagées entre le poll de secours et les callbacks Realtime de repli
     const fetchPhase = () => {
@@ -569,6 +581,122 @@ export default function ResultsPage() {
 
     router.replace(`/room/${room}?nickname=${encodeURIComponent(nickname)}`);
   }
+
+  // ── Affichage Mode Duel ──────────────────────────────────────────────────
+  if (isDuelMode && duelGuesses.length > 0) {
+    // Reconstruit les données pour l'affichage duel
+    const winners = duelGuesses.filter((g) => g.is_correct).map((g) => g.player_nickname);
+    const nobody = winners.length === 0;
+    const both = winners.length === 2;
+
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
+        <h2 style={{ margin: 0 }}>⚔️ Résultat du Duel</h2>
+
+        {/* Résumé gagnant */}
+        <div
+          className="card result-pop"
+          style={{ display: "grid", gap: 10, textAlign: "center", padding: "20px 16px" }}
+        >
+          <span style={{ fontSize: 36 }}>
+            {nobody ? "🤝" : both ? "🎉" : "🏆"}
+          </span>
+          <strong style={{ fontSize: 20 }}>
+            {nobody
+              ? "Aucun joueur n'a deviné !"
+              : both
+                ? "Les deux joueurs ont deviné !"
+                : `${winners[0]} a gagné !`}
+          </strong>
+          <p style={{ margin: 0, color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
+            {nobody
+              ? "Personne n'a trouvé le mot de l'autre."
+              : both
+                ? "Excellent duel — vous avez tous les deux trouvé le bon mot."
+                : "Quelle déduction ! Bravo !"}
+          </p>
+        </div>
+
+        {/* Détail des devinettes */}
+        <div className="card" style={{ display: "grid", gap: 10 }}>
+          <strong style={{ fontSize: 14 }}>Les réponses</strong>
+          {duelGuesses.map((g) => {
+            // Retrouve le mot correct pour ce joueur
+            const myPlayer = players.find((p) => p.nickname === g.player_nickname);
+            const correctWord = myPlayer?.role === "CIVIL" ? wordHorsTheme : wordCivil;
+            return (
+              <div
+                key={g.player_nickname}
+                style={{
+                  display: "grid",
+                  gap: 4,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: g.is_correct ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.04)",
+                  border: g.is_correct ? "1.5px solid #22c55e" : "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong style={{ fontSize: 15 }}>{g.player_nickname}</strong>
+                  <span style={{ fontSize: 20 }}>{g.is_correct ? "✅" : "❌"}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.65)" }}>
+                  A répondu :{" "}
+                  <span style={{ fontWeight: 700, color: g.is_correct ? "#22c55e" : "#f87171" }}>
+                    &ldquo;{g.guessed_word}&rdquo;
+                  </span>
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                  Bonne réponse : <span style={{ color: "#facc15", fontWeight: 600 }}>{correctWord}</span>
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Les mots du tour */}
+        {(wordCivil || wordHorsTheme) && (
+          <div className="card" style={{ display: "grid", gap: 8 }}>
+            <strong style={{ fontSize: 14 }}>Les mots du tour</strong>
+            {players.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>{p.nickname}</span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#facc15",
+                    background: "rgba(250,204,21,0.1)",
+                    border: "1px solid rgba(250,204,21,0.3)",
+                    borderRadius: 6,
+                    padding: "2px 8px",
+                  }}
+                >
+                  {p.role === "HORS_THEME" ? wordHorsTheme : wordCivil}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="btn" onClick={goToLobbyAndMaybeReset}>
+          Retour au lobby
+        </button>
+      </div>
+    );
+  }
+  // ── Fin affichage Mode Duel ──────────────────────────────────────────────
 
   return (
     <div style={{ display: "grid", gap: 16 }}>

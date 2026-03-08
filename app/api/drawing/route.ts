@@ -41,10 +41,15 @@ export async function POST(request: Request) {
     data: { publicUrl },
   } = supabaseAdmin.storage.from("drawings").getPublicUrl(storagePath);
 
-  // Enregistre l'URL (et non le base64) dans la table drawings
+  // On ajoute un paramètre ?v=timestamp à l'URL pour éviter le cache du navigateur.
+  // Sans ça, le navigateur garde l'ancien dessin car l'URL du fichier Storage
+  // est identique d'une partie à l'autre (même room, même joueur).
+  const cacheBustUrl = `${publicUrl}?v=${Date.now()}`;
+
+  // Enregistre l'URL (avec anti-cache) dans la table drawings
   const { error: dbError } = await supabaseAdmin
     .from("drawings")
-    .upsert({ room_code: roomCode, nickname, data_url: publicUrl });
+    .upsert({ room_code: roomCode, nickname, data_url: cacheBustUrl });
 
   if (dbError) {
     console.error("[drawing] Erreur upsert DB:", dbError.message);

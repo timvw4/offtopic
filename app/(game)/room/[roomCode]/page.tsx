@@ -20,6 +20,7 @@ type RoomSettings = {
   current_phase?: string | null;
   drawing_timer_seconds?: number;
   word_theme?: string | null;
+  is_duel_mode?: boolean;
 };
 
 function mapPlayerRow(row: any): Player {
@@ -58,6 +59,7 @@ export default function LobbyPage() {
     has_fantome: false,
     drawing_timer_seconds: 60,
     word_theme: "general",
+    is_duel_mode: false,
   });
   const [showCamTooltip, setShowCamTooltip] = useState(false);
   const [showDictTooltip, setShowDictTooltip] = useState(false);
@@ -183,6 +185,7 @@ export default function LobbyPage() {
           current_phase: roomRow?.current_phase ?? "LOBBY",
           drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
           word_theme: roomRow?.word_theme ?? "general",
+          is_duel_mode: roomRow?.is_duel_mode ?? false,
         });
 
         const amHost = hostNickname === nickname;
@@ -289,6 +292,7 @@ export default function LobbyPage() {
                 current_phase: n?.current_phase ?? prev.current_phase,
                 drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
                 word_theme: n?.word_theme ?? prev.word_theme ?? "general",
+                is_duel_mode: n?.is_duel_mode ?? prev.is_duel_mode ?? false,
               }));
             },
           )
@@ -375,7 +379,35 @@ export default function LobbyPage() {
     }
   }
 
-  const startDisabled = playerCount < 3 || playerCount > 15;
+  async function updateDuelMode(enabled: boolean) {
+    const room = params.roomCode;
+    const prev = settings;
+    // En mode Duel, on désactive les rôles spéciaux et on force 1 Hors-Thème
+    setSettings((s) => ({
+      ...s,
+      is_duel_mode: enabled,
+      has_cameleon: enabled ? false : s.has_cameleon,
+      has_dictator: enabled ? false : s.has_dictator,
+      has_fantome: enabled ? false : s.has_fantome,
+    }));
+    const { error } = await supabaseClient
+      .from("rooms")
+      .update({
+        is_duel_mode: enabled,
+        ...(enabled ? { has_cameleon: false, has_dictator: false, has_fantome: false } : {}),
+      })
+      .eq("code", room);
+    if (error) {
+      setSettings(prev);
+      alert("Impossible de mettre à jour le mode Duel. Réessaie.");
+    }
+  }
+
+  const isDuelMode = settings.is_duel_mode === true;
+  // En mode Duel : exactement 2 joueurs requis. Sinon : entre 3 et 15.
+  const startDisabled = isDuelMode
+    ? playerCount !== 2
+    : playerCount < 3 || playerCount > 15;
 
   if (joinError) {
     return (
@@ -411,6 +443,58 @@ export default function LobbyPage() {
 
           {showHostParams && (
             <>
+              {/* ── Toggle Mode Duel (visible uniquement à 2 joueurs) ── */}
+              {playerCount === 2 && (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: isDuelMode ? "rgba(250,204,21,0.08)" : "rgba(255,255,255,0.04)",
+                    border: isDuelMode ? "1.5px solid rgba(250,204,21,0.5)" : "1px solid rgba(255,255,255,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => updateDuelMode(!isDuelMode)}
+                >
+                  <div style={{ display: "grid", gap: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>⚔️ Mode Duel</span>
+                    <small style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+                      2 joueurs · chacun reçoit un mot différent · devine le mot de l&apos;autre
+                    </small>
+                  </div>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 12,
+                      background: isDuelMode ? "#facc15" : "rgba(255,255,255,0.14)",
+                      position: "relative",
+                      transition: "background 0.2s ease",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 3,
+                        left: isDuelMode ? 23 : 3,
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: isDuelMode ? "#0b0f1a" : "rgba(255,255,255,0.7)",
+                        transition: "left 0.2s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Les paramètres normaux sont masqués en mode Duel */}
+              {!isDuelMode && (
+              <>
               <label style={{ display: "grid", gap: 6 }}>
                 Thème des mots
                 <select
@@ -682,6 +766,8 @@ export default function LobbyPage() {
                   )}
                 </div>
               )}
+              </> /* fin !isDuelMode */
+              )}
             </>
           )}
         </div>
@@ -704,117 +790,154 @@ export default function LobbyPage() {
 
           {showPlayerParams && (
             <div style={{ display: "grid", gap: 8 }}>
-              <div>
-                <strong>Thème :</strong>{" "}
-                <span
+              {/* Mode Duel — affiché en priorité si actif */}
+              {isDuelMode ? (
+                <div
                   style={{
-                    display: "inline-block",
-                    padding: "3px 8px",
-                    borderRadius: 8,
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e5e7eb",
-                    border: "1px solid rgba(255,255,255,0.18)",
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: "rgba(250,204,21,0.08)",
+                    border: "1.5px solid rgba(250,204,21,0.5)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
                   }}
                 >
-                  {themeLabel}
-                </span>
-              </div>
-              <div>
-                <strong>Hors-Thème :</strong>{" "}
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "3px 8px",
-                    borderRadius: 8,
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e5e7eb",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                  }}
-                >
-                  {htDisplay}
-                </span>
-              </div>
-              <div>
-                <strong>Durée du dessin :</strong>{" "}
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "3px 8px",
-                    borderRadius: 8,
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e5e7eb",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                  }}
-                >
-                  {settings.drawing_timer_seconds ?? 60} secondes
-                </span>
-              </div>
-              <div style={{ display: "grid", gap: 6 }}>
-                <strong>Rôles activés :</strong>
-                {selectedCam || selectedDict || selectedFant ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      justifyContent: "flex-start",
-                    }}
-                  >
-                    {selectedCam && (
-                      <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
-                        <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={64} height={64} />
-                        <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Caméléon</span>
+                  <span style={{ fontSize: 22 }}>⚔️</span>
+                  <div style={{ display: "grid", gap: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>Mode Duel activé</span>
+                    <small style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+                      2 joueurs · chacun a un mot différent · devine le mot de l&apos;autre
+                    </small>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <strong>Thème :</strong>{" "}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "3px 8px",
+                        borderRadius: 8,
+                        background: "rgba(255,255,255,0.06)",
+                        color: "#e5e7eb",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      {themeLabel}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Hors-Thème :</strong>{" "}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "3px 8px",
+                        borderRadius: 8,
+                        background: "rgba(255,255,255,0.06)",
+                        color: "#e5e7eb",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      {htDisplay}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Durée du dessin :</strong>{" "}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "3px 8px",
+                        borderRadius: 8,
+                        background: "rgba(255,255,255,0.06)",
+                        color: "#e5e7eb",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      {settings.drawing_timer_seconds ?? 60} secondes
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <strong>Rôles activés :</strong>
+                    {selectedCam || selectedDict || selectedFant ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 12,
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          justifyContent: "flex-start",
+                        }}
+                      >
+                        {selectedCam && (
+                          <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+                            <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={64} height={64} />
+                            <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Caméléon</span>
+                          </div>
+                        )}
+                        {selectedDict && (
+                          <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+                            <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={64} height={64} />
+                            <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Dictateur</span>
+                          </div>
+                        )}
+                        {selectedFant && (
+                          <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+                            <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={64} height={64} />
+                            <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Fantôme</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {selectedDict && (
-                      <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
-                        <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={64} height={64} />
-                        <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Dictateur</span>
-                      </div>
-                    )}
-                    {selectedFant && (
-                      <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
-                        <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={64} height={64} />
-                        <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Fantôme</span>
-                      </div>
+                    ) : (
+                      <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>Aucun rôle spécial</span>
                     )}
                   </div>
-                ) : (
-                  <span style={{ color: "rgba(155, 155, 155, 0.7)" }}>Aucun rôle spécial</span>
-                )}
-              </div>
+                </>
+              )}
             </div>
           )}
         </div>
       )}
 
       {isHost ? (
-        <button
-          className="btn"
-          disabled={startDisabled}
-          style={{ opacity: startDisabled ? 0.5 : 1 }}
-          onClick={async () => {
-            const resp = await fetch("/api/game/start", {
-              method: "POST",
-              body: JSON.stringify({
-                roomCode: params.roomCode,
-                settings: {
-                  hors_theme_count: selectedHt,
-                  has_cameleon: selectedCam,
-                  has_dictator: selectedDict,
-                  has_fantome: selectedFant,
-                  word_theme: selectedTheme,
-                  drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
-                },
-              }),
-            });
-            if (!resp.ok) return;
-            router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
-          }}
-        >
-          Démarrer
-        </button>
+        <>
+          {startDisabled && isDuelMode && playerCount !== 2 && (
+            <p style={{ margin: 0, color: "rgba(250,204,21,0.85)", fontSize: 13 }}>
+              Le mode Duel nécessite exactement 2 joueurs ({playerCount} actuellement).
+            </p>
+          )}
+          {startDisabled && !isDuelMode && playerCount < 3 && (
+            <p style={{ margin: 0, color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
+              Il faut au moins 3 joueurs pour lancer une partie classique.
+            </p>
+          )}
+          <button
+            className="btn"
+            disabled={startDisabled}
+            style={{ opacity: startDisabled ? 0.5 : 1 }}
+            onClick={async () => {
+              const resp = await fetch("/api/game/start", {
+                method: "POST",
+                body: JSON.stringify({
+                  roomCode: params.roomCode,
+                  settings: {
+                    hors_theme_count: isDuelMode ? 1 : selectedHt,
+                    has_cameleon: isDuelMode ? false : selectedCam,
+                    has_dictator: isDuelMode ? false : selectedDict,
+                    has_fantome: isDuelMode ? false : selectedFant,
+                    word_theme: selectedTheme,
+                    drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
+                  },
+                }),
+              });
+              if (!resp.ok) return;
+              router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
+            }}
+          >
+            {isDuelMode ? "⚔️ Démarrer le Duel" : "Démarrer"}
+          </button>
+        </>
       ) : (
         <p>En attente de l&apos;hôte pour lancer la partie.</p>
       )}

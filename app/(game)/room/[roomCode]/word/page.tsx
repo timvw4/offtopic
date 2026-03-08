@@ -69,6 +69,7 @@ export default function WordRevealPage() {
   const [pendingReady, setPendingReady] = useState(false);
   const [isEliminated, setIsEliminated] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isDuelMode, setIsDuelMode] = useState(false);
   const wordSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Charge données et subscriptions
@@ -103,6 +104,13 @@ export default function WordRevealPage() {
         .single();
       setRole(myRole?.role || "CIVIL");
       setIsEliminated(!!myRole?.is_eliminated);
+
+      const { data: roomData } = await supabaseClient
+        .from("rooms")
+        .select("is_duel_mode")
+        .eq("code", room)
+        .maybeSingle();
+      setIsDuelMode(!!roomData?.is_duel_mode);
 
       const { data: pData } = await supabaseClient.from("players").select("*").eq("room_code", room);
       setPlayers((prev) => mergePlayers(prev, mapPlayers(pData || [])));
@@ -245,7 +253,9 @@ export default function WordRevealPage() {
         ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
         : displayedRole === "FANTOME"
           ? "Tu es un Fantôme : joue comme un civil et dessine le mot normalement. Mais si tu es éliminé, tu pourras continuer à voter depuis l'au-delà !"
-          : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème."; // CIVIL et HORS_THEME voient la même description
+          : isDuelMode
+            ? "Dessine ton mot ! Après avoir vu vos dessins, vous devrez chacun deviner le mot que l'autre a dessiné. Sois précis... mais pas trop !"
+            : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème."; // CIVIL et HORS_THEME voient la même description
   const roleMedia =
     dataLoaded && displayedRole === "CAMELEON"
       ? { src: asset("/roles/chameleon.png"), alt: "Caméléon" }

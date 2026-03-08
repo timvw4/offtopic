@@ -81,10 +81,12 @@ export async function POST(request: Request) {
 
   const { data: room } = await supabaseAdmin
     .from("rooms")
-    .select("current_phase, hors_theme_count, has_cameleon, has_dictator, has_fantome, drawing_timer_seconds, word_theme")
+    .select("current_phase, hors_theme_count, has_cameleon, has_dictator, has_fantome, drawing_timer_seconds, word_theme, is_duel_mode")
     .eq("code", roomCode)
     .single();
   assertTransition(room?.current_phase || "LOBBY", "WORD");
+
+  const isDuelMode = room?.is_duel_mode === true;
 
   const { data: players } = await supabaseAdmin
     .from("players")
@@ -92,8 +94,15 @@ export async function POST(request: Request) {
     .eq("room_code", roomCode)
     .eq("is_eliminated", false);
 
-  if (!players || players.length < 3) {
-    return NextResponse.json({ error: "Minimum 3 joueurs requis" }, { status: 400 });
+  // En mode Duel, exactement 2 joueurs requis. Sinon, minimum 3.
+  if (isDuelMode) {
+    if (!players || players.length !== 2) {
+      return NextResponse.json({ error: "Le mode Duel nécessite exactement 2 joueurs" }, { status: 400 });
+    }
+  } else {
+    if (!players || players.length < 3) {
+      return NextResponse.json({ error: "Minimum 3 joueurs requis" }, { status: 400 });
+    }
   }
 
   const baseSettings = {
@@ -132,12 +141,76 @@ export async function POST(request: Request) {
   // réellement sur "Retour au lobby".
   await supabaseAdmin.from("players").update({ is_in_lobby: false }).eq("room_code", roomCode);
 
-  // Purge des données du tour précédent (dessins, votes, accusations) pour éviter les fuites entre manches.
+  // Purge des données du tour précédent (dessins, votes, accusations, devinettes duel) pour éviter les fuites entre manches.
   await Promise.all([
     supabaseAdmin.from("drawings").delete().eq("room_code", roomCode),
     supabaseAdmin.from("votes").delete().eq("room_code", roomCode),
     supabaseAdmin.from("chameleon_accusations").delete().eq("room_code", roomCode),
+    supabaseAdmin.from("duel_guesses").delete().eq("room_code", roomCode),
   ]);
+
+  // ── Mode Duel (2 joueurs) ────────────────────────────────────────────────
+  // On assigne directement 1 CIVIL + 1 HORS_THEME sans aucun rôle spécial.
+  if (isDuelMode) {
+    const duelShuffled = shuffle(players.map((p) => p.id));
+    const [civilId, htId] = duelShuffled;
+
+    // Reset des rôles
+    await supabaseAdmin
+      .from("players")
+      .update({
+        role: "CIVIL",
+        is_eliminated: false,
+        has_used_chameleon_accusation: false,
+        is_ready: false,
+        dictator_immunity_used: false,
+        dictator_double_vote_active: false,
+      })
+      .eq("room_code", roomCode);
+
+    // Attribue le rôle HORS_THEME au 2ème joueur (sans qu'il le sache — c'est juste son mot qui change)
+    await supabaseAdmin.from("players").update({ role: "HORS_THEME" }).eq("id", htId);
+
+    const theme = mergedSettings.word_theme || "general";
+    const { data: themedPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", theme).limit(50);
+    let chosen =
+      themedPairs && themedPairs.length > 0 ? themedPairs[Math.floor(Math.random() * themedPairs.length)] : undefined;
+    if (!chosen) {
+      const { data: fallbackPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", "general").limit(50);
+      chosen = fallbackPairs && fallbackPairs.length > 0 ? fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)] : undefined;
+    }
+
+    await supabaseAdmin.from("rounds").insert({
+      room_code: roomCode,
+      phase: "WORD",
+      word_civil: chosen?.word_fr_civil || "chat",
+      word_hors_theme: chosen?.word_fr_hors_theme || "chien",
+      timer_seconds: timerSeconds,
+      tie_player_ids: null,
+      draw_starts_at: null,
+      dictator_survived: false,
+    });
+
+    await supabaseAdmin
+      .from("rooms")
+      .update({
+        current_phase: "WORD",
+        hors_theme_count: 1,
+        has_cameleon: false,
+        has_dictator: false,
+        has_fantome: false,
+        drawing_timer_seconds: timerSeconds,
+        word_theme: theme,
+      })
+      .eq("code", roomCode);
+
+    return NextResponse.json({
+      ok: true,
+      duel: true,
+      roles: { civil: civilId, hors_theme: htId },
+    });
+  }
+  // ── Fin mode Duel ────────────────────────────────────────────────────────
 
   const shuffled = shuffle(players.map((p) => p.id));
   const htCount = effective.hors_theme_count;

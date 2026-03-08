@@ -6,32 +6,61 @@ type Settings = {
   hors_theme_count: number;
   has_cameleon: boolean;
   has_dictator: boolean;
+  has_fantome: boolean;
   drawing_timer_seconds?: number;
 };
 
 function normalizeSettings(playerCount: number, settings: Settings): Settings {
+  // 3-4 joueurs : 1 seul Hors-Thème possible
   if (playerCount <= 4) {
     return {
       hors_theme_count: 1,
       has_cameleon: settings.has_cameleon,
       has_dictator: settings.has_dictator,
+      has_fantome: settings.has_fantome,
       drawing_timer_seconds: settings.drawing_timer_seconds,
     };
   }
+  // 5-6 joueurs : 1 ou 2 Hors-Thèmes
   if (playerCount <= 6) {
     const ht = [1, 2].includes(settings.hors_theme_count) ? settings.hors_theme_count : 1;
     return {
       hors_theme_count: ht,
       has_cameleon: settings.has_cameleon,
       has_dictator: settings.has_dictator,
+      has_fantome: settings.has_fantome,
       drawing_timer_seconds: settings.drawing_timer_seconds,
     };
   }
-  const ht = [2, 3].includes(settings.hors_theme_count) ? settings.hors_theme_count : 2;
+  // 7-9 joueurs : 1, 2 ou 3 Hors-Thèmes
+  if (playerCount <= 9) {
+    const ht = [1, 2, 3].includes(settings.hors_theme_count) ? settings.hors_theme_count : 2;
+    return {
+      hors_theme_count: ht,
+      has_cameleon: settings.has_cameleon,
+      has_dictator: settings.has_dictator,
+      has_fantome: settings.has_fantome,
+      drawing_timer_seconds: settings.drawing_timer_seconds,
+    };
+  }
+  // 10-12 joueurs : 1, 2, 3 ou 4 Hors-Thèmes
+  if (playerCount <= 12) {
+    const ht = [1, 2, 3, 4].includes(settings.hors_theme_count) ? settings.hors_theme_count : 3;
+    return {
+      hors_theme_count: ht,
+      has_cameleon: settings.has_cameleon,
+      has_dictator: settings.has_dictator,
+      has_fantome: settings.has_fantome,
+      drawing_timer_seconds: settings.drawing_timer_seconds,
+    };
+  }
+  // 13-15 joueurs : 1, 2, 3, 4 ou 5 Hors-Thèmes
+  const ht = [1, 2, 3, 4, 5].includes(settings.hors_theme_count) ? settings.hors_theme_count : 4;
   return {
     hors_theme_count: ht,
     has_cameleon: settings.has_cameleon,
     has_dictator: settings.has_dictator,
+    has_fantome: settings.has_fantome,
     drawing_timer_seconds: settings.drawing_timer_seconds,
   };
 }
@@ -50,7 +79,7 @@ export async function POST(request: Request) {
 
   const { data: room } = await supabaseAdmin
     .from("rooms")
-    .select("current_phase, hors_theme_count, has_cameleon, has_dictator, drawing_timer_seconds")
+    .select("current_phase, hors_theme_count, has_cameleon, has_dictator, has_fantome, drawing_timer_seconds")
     .eq("code", roomCode)
     .single();
   assertTransition(room?.current_phase || "RESULTS", "WORD");
@@ -70,6 +99,7 @@ export async function POST(request: Request) {
     hors_theme_count: room?.hors_theme_count ?? 1,
     has_cameleon: room?.has_cameleon ?? false,
     has_dictator: room?.has_dictator ?? false,
+    has_fantome: room?.has_fantome ?? false,
     drawing_timer_seconds: room?.drawing_timer_seconds ?? 60,
   });
 
@@ -126,6 +156,7 @@ export async function POST(request: Request) {
       hors_theme_count: effective.hors_theme_count,
       has_cameleon: effective.has_cameleon,
       has_dictator: effective.has_dictator,
+      has_fantome: effective.has_fantome,
       drawing_timer_seconds: timerSeconds,
     })
     .eq("code", roomCode);

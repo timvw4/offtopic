@@ -55,6 +55,12 @@ export default function ResultsPage() {
   const [accusations, setAccusations] = useState<ChameleonAccusationRow[]>([]);
   const [visibleTooltipPlayerId, setVisibleTooltipPlayerId] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [wordCivil, setWordCivil] = useState<string>("");
+  const [wordHorsTheme, setWordHorsTheme] = useState<string>("");
+  // Une fois la partie terminée, on verrouille cet état pour qu'aucune mise à jour
+  // temps réel (ex : un joueur qui rejoint le lobby et réinitialise is_eliminated)
+  // ne fasse disparaître le bouton "Retour au lobby" pour les autres joueurs.
+  const [gameEndedLocked, setGameEndedLocked] = useState(false);
   const tooltipTimeout = useRef<NodeJS.Timeout | null>(null);
   const resolvedRef = useRef(false);
 
@@ -96,7 +102,7 @@ export default function ResultsPage() {
 
     supabaseClient
       .from("rounds")
-      .select("last_eliminated_player_id, last_eliminated_is_chameleon, dictator_survived, id, tie_player_ids")
+      .select("last_eliminated_player_id, last_eliminated_is_chameleon, dictator_survived, id, tie_player_ids, word_civil, word_hors_theme")
       .eq("room_code", room)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -115,6 +121,9 @@ export default function ResultsPage() {
         );
         setRoundId(data?.id ?? null);
         setTieIds((data?.tie_player_ids as string[]) || []);
+        // Récupère les mots du tour pour les afficher en fin de partie
+        setWordCivil(data?.word_civil ?? "");
+        setWordHorsTheme(data?.word_hors_theme ?? "");
       });
 
     supabaseClient
@@ -136,47 +145,17 @@ export default function ResultsPage() {
       .maybeSingle()
       .then(({ data }) => setPhase(data?.current_phase ?? null));
 
-    channel = supabaseClient
-      .channel(`results:${room}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${room}` },
-        ({ new: n }) => setPhase(n?.current_phase ?? null),
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "players", filter: `room_code=eq.${room}` },
-        () => {
-          supabaseClient
-            .from("players")
-            .select("*")
-            .eq("room_code", room)
-            .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "chameleon_accusations", filter: `room_code=eq.${room}` },
-        () => {
-          supabaseClient
-            .from("chameleon_accusations")
-            .select("target_player_id, accuser_nickname")
-            .eq("room_code", room)
-            .then(({ data }) => setAccusations((data as ChameleonAccusationRow[]) || []));
-        },
-      )
-      .subscribe();
-
-    pollPhase = setInterval(() => {
+    // Fonctions partagées entre le poll de secours et les callbacks Realtime de repli
+    const fetchPhase = () => {
       supabaseClient
         .from("rooms")
         .select("current_phase")
         .eq("code", room)
         .single()
         .then(({ data }) => setPhase(data?.current_phase ?? null));
-    }, 500);
+    };
 
-    pollRound = setInterval(() => {
+    const fetchRound = () => {
       supabaseClient
         .from("rounds")
         .select("id, tie_player_ids, last_eliminated_player_id, last_eliminated_is_chameleon, dictator_survived")
@@ -196,7 +175,70 @@ export default function ResultsPage() {
             });
           }
         });
-    }, 500);
+    };
+
+    const startPolls = () => {
+      if (!pollPhase) pollPhase = setInterval(fetchPhase, 1500);
+      if (!pollRound) pollRound = setInterval(fetchRound, 1500);
+    };
+
+    const stopPolls = () => {
+      if (pollPhase) { clearInterval(pollPhase); pollPhase = null; }
+      if (pollRound) { clearInterval(pollRound); pollRound = null; }
+    };
+
+    channel = supabaseClient
+      .channel(`results:${room}`)
+      // 1. Changement de phase (ex: RESULTS → LOBBY lors d'un reset)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${room}` },
+        ({ new: n }) => setPhase(n?.current_phase ?? null),
+      )
+      // 2. Mise à jour des joueurs (retour au lobby, éliminations…)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "players", filter: `room_code=eq.${room}` },
+        () => {
+          supabaseClient
+            .from("players")
+            .select("*")
+            .eq("room_code", room)
+            .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
+        },
+      )
+      // 3. Accusations Caméléon
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chameleon_accusations", filter: `room_code=eq.${room}` },
+        () => {
+          supabaseClient
+            .from("chameleon_accusations")
+            .select("target_player_id, accuser_nickname")
+            .eq("room_code", room)
+            .then(({ data }) => setAccusations((data as ChameleonAccusationRow[]) || []));
+        },
+      )
+      // 4. Nouveau round calculé (remplace pollRound via Realtime)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "rounds", filter: `room_code=eq.${room}` },
+        () => fetchRound(),
+      )
+      // Pilote les polls de secours selon l'état de la connexion Realtime
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // ✅ Realtime opérationnel → stoppe tous les polls (requêtes inutiles)
+          stopPolls();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          // ❌ Realtime perdu → réactive les polls de secours
+          startPolls();
+        }
+      });
+
+    // Polls de secours : démarrent immédiatement pour couvrir la fenêtre
+    // de connexion Realtime. Stoppés automatiquement dès SUBSCRIBED.
+    startPolls();
 
     return () => {
       channel?.unsubscribe();
@@ -410,6 +452,15 @@ export default function ResultsPage() {
 
   const horsThemeMinoritaire = horsThemeAlive < alivePlayers.length / 2;
   const gameEnded = outcome && outcome !== "La partie continue";
+
+  // Verrouille gameEndedLocked dès que la partie se termine.
+  // Cela évite que les mises à jour temps réel (joueurs qui reviennent au lobby)
+  // ne remettent gameEnded à false et ne fassent disparaître le bouton "Retour au lobby".
+  useEffect(() => {
+    if (gameEnded && !gameEndedLocked) {
+      setGameEndedLocked(true);
+    }
+  }, [gameEnded, gameEndedLocked]);
   const winnersLabel =
     outcome === "Civils gagnent (tous les Hors-Thème éliminés)"
       ? "Civils"
@@ -475,19 +526,19 @@ export default function ResultsPage() {
     [],
   );
 
-  // Confettis visibles pendant 6s, puis on laisse finir la dernière chute avant de masquer la couche
+  // Affiche les confettis en fin de partie (utilise gameEndedLocked pour ne pas s'éteindre
+  // si les données temps réel remettent gameEnded à false temporairement)
   useEffect(() => {
-    if (!gameEnded || !winnersLabel) {
+    if (!gameEndedLocked || !winnersLabel) {
       setShowConfetti(false);
       return;
     }
     setShowConfetti(true);
-    const maxDelay = confettiPieces.reduce((m, c) => Math.max(m, c.delay), 0);
-    const maxDuration = confettiPieces.reduce((m, c) => Math.max(m, c.duration), 0);
-    const hideAfterMs = (5 + maxDelay + maxDuration) * 1000;
-    const id = setTimeout(() => setShowConfetti(false), hideAfterMs);
+    // Nettoyage du DOM après que tous les confettis ont fini leur chute (off-screen → invisible, pas d'effet brutal)
+    // Durée max : animation (5.4s) + délai max (1.62s) + marge → ~10s
+    const id = setTimeout(() => setShowConfetti(false), 10000);
     return () => clearTimeout(id);
-  }, [confettiPieces, gameEnded, winnersLabel]);
+  }, [gameEndedLocked, winnersLabel]);
 
   async function goToLobbyAndMaybeReset() {
     const room = params.roomCode;
@@ -624,7 +675,7 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {gameEnded && winnersLabel && (
+      {gameEndedLocked && winnersLabel && (
         <>
           {showConfetti && (
             <div className="confetti-layer" aria-hidden="true">
@@ -684,15 +735,34 @@ export default function ResultsPage() {
                         ? asset("/roles/dictator.png")
                         : p.role === "HORS_THEME"
                           ? asset("/roles/hors-theme.png")
-                          : asset("/roles/civil.png")
+                          : p.role === "FANTOME" || p.role === "FANTOME_HT"
+                            ? asset("/roles/ghost.png")
+                            : asset("/roles/civil.png")
                   }
                   alt={`Rôle ${p.role}`}
                   width={80}
                   height={80}
-                  style={{ objectFit: "contain", marginBottom: -2 }} // réduit l'espace sous l'image
+                  style={{ objectFit: "contain", marginBottom: -2 }}
                 />
                 <span style={{ fontWeight: 700 }}>{p.nickname}</span>
                 <span style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{p.role}</span>
+                {/* Mot reçu par ce joueur pendant le tour */}
+                {(wordCivil || wordHorsTheme) && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#facc15",
+                      background: "rgba(250,204,21,0.1)",
+                      border: "1px solid rgba(250,204,21,0.3)",
+                      borderRadius: 6,
+                      padding: "2px 8px",
+                      marginTop: 2,
+                    }}
+                  >
+                    {p.role === "HORS_THEME" || p.role === "FANTOME_HT" ? wordHorsTheme : wordCivil}
+                  </span>
+                )}
               </div>
             );
             })}
@@ -798,15 +868,17 @@ export default function ResultsPage() {
       )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {/* Bouton lobby uniquement si la partie est terminée et pas d'égalité */}
-        {!hasTie && gameEnded && (
+        {/* Bouton lobby uniquement si la partie est terminée et pas d'égalité.
+            On utilise gameEndedLocked (jamais remis à false) pour éviter que
+            les mises à jour temps réel ne fassent disparaître le bouton. */}
+        {!hasTie && gameEndedLocked && (
           <button className="btn" onClick={goToLobbyAndMaybeReset}>
             Retour au lobby
           </button>
         )}
 
         {!hasTie &&
-          !gameEnded &&
+          !gameEndedLocked &&
           (dictatorSurvived
             ? isHost
               ? (

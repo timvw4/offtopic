@@ -44,20 +44,39 @@ export async function POST(request: Request) {
       .eq("id", voter.id);
   }
 
-  // Vérifie si tout le monde a voté : joueurs non éliminés
+  // Vérifie si tout le monde a voté : joueurs non éliminés + Fantômes éliminés
   const { count: aliveCount } = await supabaseAdmin
     .from("players")
     .select("*", { count: "exact", head: true })
     .eq("room_code", roomCode)
     .eq("is_eliminated", false);
 
+  // Les Fantômes éliminés (FANTOME ou FANTOME_HT) peuvent encore voter — on les inclut dans le décompte attendu
+  const { count: fantomePureCount } = await supabaseAdmin
+    .from("players")
+    .select("*", { count: "exact", head: true })
+    .eq("room_code", roomCode)
+    .eq("is_eliminated", true)
+    .eq("role", "FANTOME");
+
+  const { count: fantomeHtCount } = await supabaseAdmin
+    .from("players")
+    .select("*", { count: "exact", head: true })
+    .eq("room_code", roomCode)
+    .eq("is_eliminated", true)
+    .eq("role", "FANTOME_HT");
+
+  const fantomeCount = (fantomePureCount ?? 0) + (fantomeHtCount ?? 0);
+
   const { count: voteCount } = await supabaseAdmin
     .from("votes")
     .select("*", { count: "exact", head: true })
     .eq("round_id", round?.id);
 
-  // Tous les joueurs non éliminés doivent voter avant de passer en RESULTS.
-  if (aliveCount !== null && voteCount !== null && voteCount >= aliveCount) {
+  const expectedVoters = (aliveCount ?? 0) + fantomeCount;
+
+  // Tous les joueurs non éliminés + les Fantômes doivent voter avant de passer en RESULTS.
+  if (voteCount !== null && voteCount >= expectedVoters) {
     const { data: room } = await supabaseAdmin.from("rooms").select("current_phase").eq("code", roomCode).single();
     assertTransition(room?.current_phase || "VOTE", "RESULTS");
     await supabaseAdmin.from("rooms").update({ current_phase: "RESULTS" }).eq("code", roomCode);

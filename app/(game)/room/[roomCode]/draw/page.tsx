@@ -27,6 +27,29 @@ export default function DrawPage() {
     let channel: ReturnType<typeof supabaseClient.channel> | null = null;
     let pollRound: NodeJS.Timeout | null = null;
 
+    // Fonction partagée entre le poll de secours et le callback Realtime de repli
+    const fetchRound = () => {
+      supabaseClient
+        .from("rounds")
+        .select("draw_starts_at")
+        .eq("room_code", room)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+        .then(({ data }) => setDrawStartsAt(data?.draw_starts_at ?? null));
+    };
+
+    const startPollRound = () => {
+      if (!pollRound) pollRound = setInterval(fetchRound, 2000);
+    };
+
+    const stopPollRound = () => {
+      if (pollRound) { clearInterval(pollRound); pollRound = null; }
+    };
+
+    // Poll de secours démarre immédiatement pour couvrir la fenêtre de connexion Realtime
+    startPollRound();
+
     async function init() {
       const { data } = await supabaseClient
         .from("rounds")
@@ -53,19 +76,16 @@ export default function DrawPage() {
           { event: "UPDATE", schema: "public", table: "rounds", filter: `room_code=eq.${room}` },
           ({ new: n }) => setDrawStartsAt(n?.draw_starts_at ?? null),
         )
-        .subscribe();
-
-      // Polling de secours si l'événement Realtime ne passe pas
-      pollRound = setInterval(() => {
-        supabaseClient
-          .from("rounds")
-          .select("draw_starts_at")
-          .eq("room_code", room)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-          .then(({ data }) => setDrawStartsAt(data?.draw_starts_at ?? null));
-      }, 500);
+        // Pilote le poll de secours selon l'état de la connexion Realtime
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            // ✅ Realtime opérationnel → stoppe le poll (requête inutile)
+            stopPollRound();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            // ❌ Realtime perdu → réactive le poll de secours
+            startPollRound();
+          }
+        });
     }
 
     void init();
@@ -121,7 +141,7 @@ export default function DrawPage() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <h2>Dessine</h2>
+      <h2>Dessine subtilement le mot</h2>
 
       {countdown !== null && countdown > 0 && (
         <>

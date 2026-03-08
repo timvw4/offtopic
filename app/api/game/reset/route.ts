@@ -23,6 +23,18 @@ export async function POST(request: Request) {
     .update({ current_phase: "LOBBY" })
     .eq("code", roomCode);
 
+  // ─── Supprime les fichiers PNG du bucket Storage pour cette room ──────────
+  // Les dessins sont maintenant dans storage.drawings/{roomCode}/*.png
+  // Il faut les supprimer ici pour ne pas accumuler des fichiers orphelins.
+  const { data: storageFiles } = await supabaseAdmin.storage
+    .from("drawings")
+    .list(roomCode);
+
+  if (storageFiles && storageFiles.length > 0) {
+    const paths = storageFiles.map((f) => `${roomCode}/${f.name}`);
+    await supabaseAdmin.storage.from("drawings").remove(paths);
+  }
+
   // Nettoyage complet des données de manche pour repartir sainement
   await Promise.all([
     supabaseAdmin.from("drawings").delete().eq("room_code", roomCode),

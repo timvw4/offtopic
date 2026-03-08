@@ -276,7 +276,6 @@ export default function RevealPage() {
                     fill
                     sizes="320px"
                     style={{ objectFit: "contain", background: "#ffffff" }}
-                    unoptimized
                   />
                 </div>
                 <div

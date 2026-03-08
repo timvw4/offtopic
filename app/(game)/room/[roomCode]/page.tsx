@@ -15,6 +15,7 @@ type RoomSettings = {
   hors_theme_count: number;
   has_cameleon: boolean;
   has_dictator: boolean;
+  has_fantome: boolean;
   host_nickname?: string | null;
   current_phase?: string | null;
   drawing_timer_seconds?: number;
@@ -36,9 +37,11 @@ function mapPlayerRow(row: any): Player {
 }
 
 function allowedSettings(playerCount: number) {
-  if (playerCount <= 4) return { options: [1], camAllowed: true };
-  if (playerCount <= 6) return { options: [1, 2], camAllowed: true };
-  return { options: [2, 3], camAllowed: true }; // 7-8
+  if (playerCount <= 4)  return { options: [1],             camAllowed: true }; // 3-4 joueurs
+  if (playerCount <= 6)  return { options: [1, 2],          camAllowed: true }; // 5-6 joueurs
+  if (playerCount <= 9)  return { options: [1, 2, 3],       camAllowed: true }; // 7-9 joueurs
+  if (playerCount <= 12) return { options: [1, 2, 3, 4],    camAllowed: true }; // 10-12 joueurs
+  return                        { options: [1, 2, 3, 4, 5], camAllowed: true }; // 13-15 joueurs
 }
 
 export default function LobbyPage() {
@@ -52,11 +55,13 @@ export default function LobbyPage() {
     hors_theme_count: 1,
     has_cameleon: false,
     has_dictator: false,
+    has_fantome: false,
     drawing_timer_seconds: 60,
     word_theme: "general",
   });
   const [showCamTooltip, setShowCamTooltip] = useState(false);
   const [showDictTooltip, setShowDictTooltip] = useState(false);
+  const [showFantTooltip, setShowFantTooltip] = useState(false);
   const [showRolesList, setShowRolesList] = useState(false);
   const [showHostParams, setShowHostParams] = useState(false);
   const [showPlayerParams, setShowPlayerParams] = useState(true);
@@ -70,10 +75,11 @@ export default function LobbyPage() {
   const selectedHt = options.includes(settings.hors_theme_count) ? settings.hors_theme_count : options[0];
   const selectedCam = settings.has_cameleon ?? false;
   const selectedDict = settings.has_dictator ?? false;
+  const selectedFant = settings.has_fantome ?? false;
   const selectedTheme = settings.word_theme || "general";
   const htDisplay = selectedHt === 1 ? "1 Hors-Thème" : `${selectedHt} Hors-Thèmes`;
 
-  // Liste des thèmes disponibles (alignée avec la nouvelle seed SQL 0017)
+  // Liste des thèmes disponibles (alignée avec les seeds SQL 0017 + 0019)
   const themes = [
     { value: "general", label: "Général" },
     { value: "objets_quotidien", label: "Objets du quotidien" },
@@ -81,6 +87,9 @@ export default function LobbyPage() {
     { value: "nature", label: "Nature" },
     { value: "technologie", label: "Technologie" },
     { value: "divertissement", label: "Divertissement" },
+    { value: "sports", label: "Sports" },
+    { value: "fantastique", label: "Fantastique" },
+    { value: "metiers", label: "Métiers" },
   ];
 
   const themeLabel = themes.find((t) => t.value === selectedTheme)?.label ?? "Général";
@@ -154,6 +163,7 @@ export default function LobbyPage() {
               hors_theme_count: 1,
               has_cameleon: false,
               has_dictator: false,
+              has_fantome: false,
               current_phase: "LOBBY",
               word_theme: "general",
             })
@@ -168,6 +178,7 @@ export default function LobbyPage() {
           hors_theme_count: roomRow?.hors_theme_count ?? 1,
           has_cameleon: roomRow?.has_cameleon ?? false,
           has_dictator: roomRow?.has_dictator ?? false,
+          has_fantome: roomRow?.has_fantome ?? false,
           host_nickname: hostNickname,
           current_phase: roomRow?.current_phase ?? "LOBBY",
           drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
@@ -273,6 +284,7 @@ export default function LobbyPage() {
                 hors_theme_count: n?.hors_theme_count ?? prev.hors_theme_count,
                 has_cameleon: n?.has_cameleon ?? prev.has_cameleon,
                 has_dictator: n?.has_dictator ?? prev.has_dictator,
+                has_fantome: n?.has_fantome ?? prev.has_fantome,
                 host_nickname: n?.host_nickname ?? prev.host_nickname,
                 current_phase: n?.current_phase ?? prev.current_phase,
                 drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
@@ -334,15 +346,16 @@ export default function LobbyPage() {
     hors_theme_count: number,
     has_cameleon: boolean,
     has_dictator: boolean,
+    has_fantome: boolean,
     word_theme?: string,
   ) {
     const room = params.roomCode;
     const nextTheme = word_theme ?? settings.word_theme ?? "general";
     const prev = settings;
-    setSettings((s) => ({ ...s, hors_theme_count, has_cameleon, has_dictator, word_theme: nextTheme }));
+    setSettings((s) => ({ ...s, hors_theme_count, has_cameleon, has_dictator, has_fantome, word_theme: nextTheme }));
     const { error } = await supabaseClient
       .from("rooms")
-      .update({ hors_theme_count, has_cameleon, has_dictator, word_theme: nextTheme })
+      .update({ hors_theme_count, has_cameleon, has_dictator, has_fantome, word_theme: nextTheme })
       .eq("code", room);
     if (error) {
       // Si l'écriture échoue (ex : RLS), on rétablit l'état local et on affiche un message.
@@ -362,7 +375,7 @@ export default function LobbyPage() {
     }
   }
 
-  const startDisabled = playerCount < 3 || playerCount > 8;
+  const startDisabled = playerCount < 3 || playerCount > 15;
 
   if (joinError) {
     return (
@@ -379,12 +392,12 @@ export default function LobbyPage() {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <h2>Lobby</h2>
-      <PlayerList players={players} showStatus={false} dimEliminated={false} />
+      <PlayerList players={players} showStatus={false} dimEliminated={false} showLobbyStatus={true} />
 
       {isHost && (
         <div
           className="card"
-          style={{ display: "grid", gap: 10, border: "1px solid #87ceeb" /* contour bleu clair */ }}
+          style={{ display: "grid", gap: 10 }}
         >
           <button
             type="button"
@@ -403,7 +416,7 @@ export default function LobbyPage() {
                 <select
                   className="input"
                   value={selectedTheme}
-                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.value)}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, selectedFant, e.target.value)}
                 >
                   {themes.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -431,7 +444,7 @@ export default function LobbyPage() {
                   <select
                     className="input"
                     value={selectedHt}
-                    onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedTheme)}
+                    onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedFant, selectedTheme)}
                   >
                     {options.map((opt) => (
                       <option key={opt} value={opt}>
@@ -519,7 +532,7 @@ export default function LobbyPage() {
                       type="checkbox"
                       checked={selectedCam}
                       style={getRoleCheckboxStyle(selectedCam)}
-                      onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedTheme)}
+                      onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedFant, selectedTheme)}
                     />
                     <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
                     <div style={{ display: "grid", gap: 4 }}>
@@ -553,7 +566,7 @@ export default function LobbyPage() {
                       type="checkbox"
                       checked={selectedDict}
                       style={getRoleCheckboxStyle(selectedDict)}
-                      onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedTheme)}
+                      onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedFant, selectedTheme)}
                     />
                     <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
                     <div style={{ display: "grid", gap: 4 }}>
@@ -581,10 +594,43 @@ export default function LobbyPage() {
                       </small>
                     </div>
                   </label>
-                  <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>D&apos;autres rôles seront ajoutés plus tard.</p>
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
+                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedFant}
+                      style={getRoleCheckboxStyle(selectedFant)}
+                      onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.checked, selectedTheme)}
+                    />
+                    <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={80} height={80} style={{ objectFit: "contain" }} />
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          Fantôme
+                          <button
+                            type="button"
+                            className="tooltip-icon"
+                            aria-label="Infos Fantôme"
+                            onClick={() => setShowFantTooltip((v) => !v)}
+                          >
+                            i
+                          </button>
+                          {showFantTooltip && (
+                            <div className="tooltip-content">
+                              Le Fantôme joue comme un Civil avec le même mot. Mais s&apos;il est éliminé,
+                              il devient un fantôme et peut continuer à voter dans tous les tours suivants !
+                            </div>
+                          )}
+                        </span>
+                      </div>
+                      <small style={{ color: "var(--muted)" }}>
+                        S&apos;il est éliminé, il continue de voter depuis l&apos;au-delà.
+                      </small>
+                    </div>
+                  </label>
                 </div>
               )}
-              {(selectedCam || selectedDict) && (
+              {(selectedCam || selectedDict || selectedFant) && (
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "6px 2px" }}>
                   {selectedCam && (
                     <div
@@ -616,6 +662,22 @@ export default function LobbyPage() {
                       }}
                     >
                       <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={48} height={48} />
+                    </div>
+                  )}
+                  {selectedFant && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        padding: "6px 10px",
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                      }}
+                    >
+                      <Image src={asset("/roles/ghost.png")} alt="Fantôme sélectionné" width={48} height={48} />
                     </div>
                   )}
                 </div>
@@ -689,7 +751,7 @@ export default function LobbyPage() {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <strong>Rôles activés :</strong>
-                {selectedCam || selectedDict ? (
+                {selectedCam || selectedDict || selectedFant ? (
                   <div
                     style={{
                       display: "flex",
@@ -700,27 +762,21 @@ export default function LobbyPage() {
                     }}
                   >
                     {selectedCam && (
-                      <div
-                        style={{
-                          display: "grid",
-                          justifyItems: "center",
-                          gap: 4,
-                        }}
-                      >
+                      <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
                         <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={64} height={64} />
                         <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Caméléon</span>
                       </div>
                     )}
                     {selectedDict && (
-                      <div
-                        style={{
-                          display: "grid",
-                          justifyItems: "center",
-                          gap: 4,
-                        }}
-                      >
+                      <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
                         <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={64} height={64} />
                         <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Dictateur</span>
+                      </div>
+                    )}
+                    {selectedFant && (
+                      <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+                        <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={64} height={64} />
+                        <span style={{ fontWeight: 700, fontSize: 13, textAlign: "center" }}>Fantôme</span>
                       </div>
                     )}
                   </div>
@@ -747,6 +803,7 @@ export default function LobbyPage() {
                   hors_theme_count: selectedHt,
                   has_cameleon: selectedCam,
                   has_dictator: selectedDict,
+                  has_fantome: selectedFant,
                   word_theme: selectedTheme,
                   drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
                 },

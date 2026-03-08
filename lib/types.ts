@@ -1,4 +1,4 @@
-export type Role = "CIVIL" | "HORS_THEME" | "CAMELEON" | "DICTATOR";
+export type Role = "CIVIL" | "HORS_THEME" | "CAMELEON" | "DICTATOR" | "FANTOME" | "FANTOME_HT";
 
 // Phases réellement utilisées dans le flux actuel
 export type GamePhase = "LOBBY" | "WORD" | "DRAW" | "REVEAL" | "VOTE" | "RESULTS";

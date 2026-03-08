@@ -220,44 +220,51 @@ export default function WordRevealPage() {
   }, [drawStartsAt, isEliminated, nickname, params.roomCode, router, timerSeconds]);
 
   // Ne montre pas le mot tant que le round + rôle ne sont pas chargés
-  const displayedWord = dataLoaded ? (role === "HORS_THEME" ? wordHorsTheme : wordCivil) : "...";
+  // HORS_THEME et FANTOME_HT reçoivent le mot hors-thème (le Fantôme-HT ne sait pas qu'il a un mot différent)
+  const displayedWord = dataLoaded ? (role === "HORS_THEME" || role === "FANTOME_HT" ? wordHorsTheme : wordCivil) : "...";
+
+  // Le Hors-Thème est traité visuellement comme un Civil : il ne sait pas qu'il a un mot différent.
+  // Le FANTOME_HT voit les infos Fantôme (il sait qu'il est Fantôme) mais reçoit le mot HT à son insu.
+  // On utilise displayedRole pour tout ce qui est affiché (label, image, description).
+  const displayedRole = role === "HORS_THEME" ? "CIVIL" : role === "FANTOME_HT" ? "FANTOME" : role;
+
   const roleLabel = !dataLoaded
     ? "..."
-    : role === "HORS_THEME"
-      ? "Hors-Thème"
-      : role === "CAMELEON"
-        ? "Caméléon"
-        : role === "DICTATOR"
-          ? "Dictateur"
-          : "Civil";
+    : displayedRole === "CAMELEON"
+      ? "Caméléon"
+      : displayedRole === "DICTATOR"
+        ? "Dictateur"
+        : displayedRole === "FANTOME"
+          ? "Fantôme"
+          : "Civil"; // CIVIL et HORS_THEME affichent tous les deux "Civil"
   const roleDescription = !dataLoaded
     ? "Chargement..."
-    : role === "HORS_THEME"
-      ? "Tu as un mot légèrement différent des civils. Ne te fais pas démasqué par les autres joueurs pour gagner."
-      : role === "CAMELEON"
-        ? "Tu as le même mot que les civils et tu dois te faire passer pour un hors-thème et te faire éliminé pour gagner. attention tu ne dois pas te faire repérer par les autres joueurs."
-        : role === "DICTATOR"
-          ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
-          : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème.";
+    : displayedRole === "CAMELEON"
+      ? "Tu as le même mot que les civils et tu dois te faire passer pour un hors-thème et te faire éliminé pour gagner. attention tu ne dois pas te faire repérer par les autres joueurs."
+      : displayedRole === "DICTATOR"
+        ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
+        : displayedRole === "FANTOME"
+          ? "Tu es un Fantôme : joue comme un civil et dessine le mot normalement. Mais si tu es éliminé, tu pourras continuer à voter depuis l'au-delà !"
+          : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème."; // CIVIL et HORS_THEME voient la même description
   const roleMedia =
-    dataLoaded && role === "CAMELEON"
+    dataLoaded && displayedRole === "CAMELEON"
       ? { src: asset("/roles/chameleon.png"), alt: "Caméléon" }
-      : dataLoaded && role === "DICTATOR"
+      : dataLoaded && displayedRole === "DICTATOR"
         ? { src: asset("/roles/dictator.png"), alt: "Dictateur" }
-        : dataLoaded && role === "HORS_THEME"
-          ? { src: asset("/roles/hors-theme.png"), alt: "Hors-Thème" }
-          : dataLoaded && role === "CIVIL"
-            ? { src: asset("/roles/civil.png"), alt: "Civil" }
+        : dataLoaded && displayedRole === "FANTOME"
+          ? { src: asset("/roles/ghost.png"), alt: "Fantôme" }
+          : dataLoaded
+            ? { src: asset("/roles/civil.png"), alt: "Civil" } // CIVIL et HORS_THEME voient l'image Civil
             : null;
   // Images et titres légèrement réduits pour Civil / Hors-Thème (plus lisible sur mobile)
-  const roleImageSize = role === "CIVIL" || role === "HORS_THEME" ? 130 : 170;
+  const roleImageSize = displayedRole === "CIVIL" ? 130 : 170;
   const roleImageStyle = {
     objectFit: "contain",
     filter: "drop-shadow(0 0 8px rgba(0,0,0,0.25))",
     marginTop: -10,
-    marginBottom: role === "HORS_THEME" ? 6 : role === "CIVIL" ? -12 : 0, // espace texte/image pour H-T, léger ajustement civil
+    marginBottom: displayedRole === "CIVIL" ? -12 : 0,
   } as const;
-  const roleLabelMarginTop = role === "CIVIL" ? 0 : -30;
+  const roleLabelMarginTop = displayedRole === "CIVIL" ? 0 : -30;
 
   return (
     <div ref={wordSectionRef} style={{ display: "grid", gap: 16 }}>

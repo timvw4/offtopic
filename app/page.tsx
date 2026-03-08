@@ -56,7 +56,10 @@ export default function HomePage() {
         setError("Code de salle invalide ou inexistant.");
         return;
       }
-      if (data.current_phase && data.current_phase !== "LOBBY") {
+      // Bloquer uniquement pendant les phases de jeu actif.
+      // "RESULTS" est autorisé car la partie est terminée et les joueurs reviennent au lobby.
+      const activeGamePhases = ["WORD", "DRAW", "REVEAL", "VOTE"];
+      if (data.current_phase && activeGamePhases.includes(data.current_phase)) {
         setError("Partie déjà en cours, impossible de rejoindre.");
         return;
       }

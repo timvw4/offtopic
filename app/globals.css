@@ -298,7 +298,8 @@ hr {
   width: 8px;
   height: 14px;
   border-radius: 2px;
-  animation: confettiFall var(--duration) linear var(--delay) 1 both;
+  /* 1 seule chute (pas de boucle), forwards = reste en bas une fois arrivé hors écran */
+  animation: confettiFall var(--duration) linear var(--delay) 1 forwards;
   opacity: 0.9;
 }
 

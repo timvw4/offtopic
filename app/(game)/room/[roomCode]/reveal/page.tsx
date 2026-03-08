@@ -202,7 +202,7 @@ export default function RevealPage() {
       if (isDuelMode) {
         router.replace(`/room/${params.roomCode}/guess?nickname=${encodeURIComponent(nickname)}`);
       } else {
-        router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
+      router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
       }
     }
   }, [phase, nickname, params.roomCode, router, isDuelMode]);

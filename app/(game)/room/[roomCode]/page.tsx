@@ -426,7 +426,264 @@ export default function LobbyPage() {
       <h2>Lobby</h2>
       <PlayerList players={players} showStatus={false} dimEliminated={false} showLobbyStatus={true} />
 
-      {isHost && (
+      {/* ── Toggle Mode Duel (visible pour l'hôte uniquement à 2 joueurs, hors panneau Paramètres) ── */}
+      {isHost && playerCount === 2 && (
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: isDuelMode ? "rgba(250,204,21,0.08)" : "rgba(255,255,255,0.04)",
+            border: isDuelMode ? "1.5px solid rgba(250,204,21,0.5)" : "1px solid rgba(255,255,255,0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            cursor: "pointer",
+          }}
+          onClick={() => updateDuelMode(!isDuelMode)}
+        >
+          <div style={{ display: "grid", gap: 2 }}>
+            <span style={{ fontWeight: 700, fontSize: 15 }}>⚔️ Mode Duel</span>
+            <small style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+              2 joueurs · chacun reçoit un mot différent · devine le mot de l&apos;autre
+            </small>
+          </div>
+          <div
+            style={{
+              width: 44,
+              height: 24,
+              borderRadius: 12,
+              background: isDuelMode ? "#facc15" : "rgba(255,255,255,0.14)",
+              position: "relative",
+              transition: "background 0.2s ease",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                top: 3,
+                left: isDuelMode ? 23 : 3,
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                background: isDuelMode ? "#0b0f1a" : "rgba(255,255,255,0.7)",
+                transition: "left 0.2s ease",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Bouton "Ajoute des rôles" (hors panneau Paramètres, visible hôte + hors duel) ── */}
+      {isHost && !isDuelMode && (
+        <>
+          <button
+            type="button"
+            className="btn btn-compact btn-ghost"
+            style={{
+              border: "1.5px solid rgb(128, 128, 128)",
+              color: "#fff",
+              background: "rgba(0, 0, 0, 0.82)",
+              position: "relative",
+              overflow: "hidden",
+              height: 64,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+            }}
+            onClick={() => setShowRolesList((v) => !v)}
+          >
+            <Image
+              src="/roles.png"
+              alt="Illustration des rôles"
+              fill
+              sizes="320px"
+              style={{ objectFit: "cover", opacity: 0.8 }}
+              priority
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.5)",
+                zIndex: 1,
+                pointerEvents: "none",
+              }}
+            />
+            <span
+              style={{
+                position: "relative",
+                zIndex: 2,
+                fontWeight: 700,
+                fontSize: 22,
+                textShadow: "0 2px 6px rgba(0, 0, 0, 0.35)",
+              }}
+            >
+              Ajoute des rôles
+            </span>
+          </button>
+
+          {showRolesList && (
+            <div
+              style={{
+                display: "grid",
+                gap: 8,
+                padding: 10,
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.04)",
+              }}
+            >
+              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedCam}
+                  style={getRoleCheckboxStyle(selectedCam)}
+                  onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedFant, selectedTheme)}
+                />
+                <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      Caméléon
+                      <button
+                        type="button"
+                        className="tooltip-icon"
+                        aria-label="Infos Caméléon"
+                        onClick={() => setShowCamTooltip((v) => !v)}
+                      >
+                        i
+                      </button>
+                      {showCamTooltip && (
+                        <div className="tooltip-content">
+                          Le Caméléon reçoit le même mot que les civils, mais il joue seul contre tous.
+                          Son objectif est de se faire éliminer en se faisant passer pour un joueur Hors-Thème, sans jamais être démasqué comme Caméléon. Si le Caméléon est correctement accusé, il est éliminé et perd immédiatement.
+                        </div>
+                      )}
+                    </span>
+                  </div>
+                  <small style={{ color: "var(--muted)" }}>
+                    Le Caméléon connaît le mot mais doit se faire passer pour un joueur Hors-Thème sans se faire démasquer.
+                  </small>
+                </div>
+              </label>
+              <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
+              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedDict}
+                  style={getRoleCheckboxStyle(selectedDict)}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedFant, selectedTheme)}
+                />
+                <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      Dictateur
+                      <button
+                        type="button"
+                        className="tooltip-icon"
+                        aria-label="Infos Dictateur"
+                        onClick={() => setShowDictTooltip((v) => !v)}
+                      >
+                        i
+                      </button>
+                      {showDictTooltip && (
+                        <div className="tooltip-content">
+                          Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
+                          Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
+                        </div>
+                      )}
+                    </span>
+                  </div>
+                  <small style={{ color: "var(--muted)" }}>
+                    Si la majorité vote contre lui une première fois, il survit et son prochain vote compte double.
+                  </small>
+                </div>
+              </label>
+              <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
+              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedFant}
+                  style={getRoleCheckboxStyle(selectedFant)}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.checked, selectedTheme)}
+                />
+                <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={80} height={80} style={{ objectFit: "contain" }} />
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      Fantôme
+                      <button
+                        type="button"
+                        className="tooltip-icon"
+                        aria-label="Infos Fantôme"
+                        onClick={() => setShowFantTooltip((v) => !v)}
+                      >
+                        i
+                      </button>
+                      {showFantTooltip && (
+                        <div className="tooltip-content">
+                          Le Fantôme joue comme un Civil avec le même mot. Mais s&apos;il est éliminé,
+                          il devient un fantôme et peut continuer à voter dans tous les tours suivants !
+                        </div>
+                      )}
+                    </span>
+                  </div>
+                  <small style={{ color: "var(--muted)" }}>
+                    S&apos;il est éliminé, il continue de voter depuis l&apos;au-delà.
+                  </small>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {(selectedCam || selectedDict || selectedFant) && (
+            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "6px 2px" }}>
+              {selectedCam && (
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 6, padding: "6px 10px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={48} height={48} />
+                </div>
+              )}
+              {selectedDict && (
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 6, padding: "6px 10px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={48} height={48} />
+                </div>
+              )}
+              {selectedFant && (
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 6, padding: "6px 10px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  <Image src={asset("/roles/ghost.png")} alt="Fantôme sélectionné" width={48} height={48} />
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Panneau Paramètres (masqué en mode Duel car tout est désactivé) */}
+      {isHost && !isDuelMode && (
         <div
           className="card"
           style={{ display: "grid", gap: 10 }}
@@ -442,59 +699,7 @@ export default function LobbyPage() {
           </button>
 
           {showHostParams && (
-            <>
-              {/* ── Toggle Mode Duel (visible uniquement à 2 joueurs) ── */}
-              {playerCount === 2 && (
-                <div
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: 10,
-                    background: isDuelMode ? "rgba(250,204,21,0.08)" : "rgba(255,255,255,0.04)",
-                    border: isDuelMode ? "1.5px solid rgba(250,204,21,0.5)" : "1px solid rgba(255,255,255,0.12)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => updateDuelMode(!isDuelMode)}
-                >
-                  <div style={{ display: "grid", gap: 2 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15 }}>⚔️ Mode Duel</span>
-                    <small style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
-                      2 joueurs · chacun reçoit un mot différent · devine le mot de l&apos;autre
-                    </small>
-                  </div>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 24,
-                      borderRadius: 12,
-                      background: isDuelMode ? "#facc15" : "rgba(255,255,255,0.14)",
-                      position: "relative",
-                      transition: "background 0.2s ease",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 3,
-                        left: isDuelMode ? 23 : 3,
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        background: isDuelMode ? "#0b0f1a" : "rgba(255,255,255,0.7)",
-                        transition: "left 0.2s ease",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Les paramètres normaux sont masqués en mode Duel */}
-              {!isDuelMode && (
-              <>
+            <div style={{ display: "grid", gap: 10 }}>
               <label style={{ display: "grid", gap: 6 }}>
                 Thème des mots
                 <select
@@ -552,226 +757,10 @@ export default function LobbyPage() {
                   ))}
                 </select>
               </label>
-              <button
-                type="button"
-                className="btn btn-compact btn-ghost"
-                style={{
-                  border: "1.5px solid rgb(128, 128, 128)" /* contour bleu clair */,
-                  color: "#fff",
-                  background: "rgba(0, 0, 0, 0.82)",
-                  position: "relative",
-                  overflow: "hidden",
-                  height: 64,
-                  padding: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                }}
-                onClick={() => setShowRolesList((v) => !v)}
-              >
-                <Image
-                  src="/roles.png"
-                  alt="Illustration des rôles"
-                  fill
-                  sizes="320px"
-                  style={{ objectFit: "cover", opacity: 0.8 }}
-                  priority
-                />
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "rgba(0,0,0,0.5)",
-                    zIndex: 1,
-                    pointerEvents: "none",
-                  }}
-                />
-                <span
-                  style={{
-                    position: "relative",
-                    zIndex: 2,
-                    fontWeight: 700,
-                    fontSize: 22,
-                    textShadow: "0 2px 6px rgba(0, 0, 0, 0.35)",
-                  }}
-                >
-                  Ajoute des rôles
-                </span>
-              </button>
-              {showRolesList && (
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 8,
-                    padding: 10,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 10,
-                    background: "rgba(255,255,255,0.04)",
-                  }}
-                >
-                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedCam}
-                      style={getRoleCheckboxStyle(selectedCam)}
-                      onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedFant, selectedTheme)}
-                    />
-                    <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
-                    <div style={{ display: "grid", gap: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          Caméléon
-                          <button
-                            type="button"
-                            className="tooltip-icon"
-                            aria-label="Infos Caméléon"
-                            onClick={() => setShowCamTooltip((v) => !v)}
-                          >
-                            i
-                          </button>
-                          {showCamTooltip && (
-                            <div className="tooltip-content">
-                              Le Caméléon reçoit le même mot que les civils, mais il joue seul contre tous.
-                              Son objectif est de se faire éliminer en se faisant passer pour un joueur Hors-Thème, sans jamais être démasqué comme Caméléon. Si le Caméléon est correctement accusé, il est éliminé et perd immédiatement.
-                            </div>
-                          )}
-                        </span>
-                      </div>
-                      <small style={{ color: "var(--muted)" }}>
-                        Le Caméléon connaît le mot mais doit se faire passer pour un joueur Hors-Thème sans se faire démasquer.
-                      </small>
-                    </div>
-                  </label>
-                  <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
-                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedDict}
-                      style={getRoleCheckboxStyle(selectedDict)}
-                      onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedFant, selectedTheme)}
-                    />
-                    <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
-                    <div style={{ display: "grid", gap: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          Dictateur
-                          <button
-                            type="button"
-                            className="tooltip-icon"
-                            aria-label="Infos Dictateur"
-                            onClick={() => setShowDictTooltip((v) => !v)}
-                          >
-                            i
-                          </button>
-                          {showDictTooltip && (
-                            <div className="tooltip-content">
-                              Le Dictateur joue comme un civil mais survit à la première majorité contre lui.
-                              Son prochain vote compte double. S&apos;il est de nouveau majoritaire plus tard, il est éliminé.
-                            </div>
-                          )}
-                        </span>
-                      </div>
-                      <small style={{ color: "var(--muted)" }}>
-                        Si la majorité vote contre lui une première fois, il survit et son prochain vote compte double.
-                      </small>
-                    </div>
-                  </label>
-                  <div style={{ height: 1, background: "rgba(255,255,255,0.16)", margin: "4px 0" }} />
-                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedFant}
-                      style={getRoleCheckboxStyle(selectedFant)}
-                      onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.checked, selectedTheme)}
-                    />
-                    <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={80} height={80} style={{ objectFit: "contain" }} />
-                    <div style={{ display: "grid", gap: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="tooltip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          Fantôme
-                          <button
-                            type="button"
-                            className="tooltip-icon"
-                            aria-label="Infos Fantôme"
-                            onClick={() => setShowFantTooltip((v) => !v)}
-                          >
-                            i
-                          </button>
-                          {showFantTooltip && (
-                            <div className="tooltip-content">
-                              Le Fantôme joue comme un Civil avec le même mot. Mais s&apos;il est éliminé,
-                              il devient un fantôme et peut continuer à voter dans tous les tours suivants !
-                            </div>
-                          )}
-                        </span>
-                      </div>
-                      <small style={{ color: "var(--muted)" }}>
-                        S&apos;il est éliminé, il continue de voter depuis l&apos;au-delà.
-                      </small>
-                    </div>
-                  </label>
-                </div>
-              )}
-              {(selectedCam || selectedDict || selectedFant) && (
-                <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "6px 2px" }}>
-                  {selectedCam && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        padding: "6px 10px",
-                        borderRadius: 10,
-                        background: "rgba(255,255,255,0.05)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                      }}
-                    >
-                      <Image src={asset("/roles/chameleon.png")} alt="Caméléon sélectionné" width={48} height={48} />
-                    </div>
-                  )}
-                  {selectedDict && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        padding: "6px 10px",
-                        borderRadius: 10,
-                        background: "rgba(255,255,255,0.05)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                      }}
-                    >
-                      <Image src={asset("/roles/dictator.png")} alt="Dictateur sélectionné" width={48} height={48} />
-                    </div>
-                  )}
-                  {selectedFant && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        padding: "6px 10px",
-                        borderRadius: 10,
-                        background: "rgba(255,255,255,0.05)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                      }}
-                    >
-                      <Image src={asset("/roles/ghost.png")} alt="Fantôme sélectionné" width={48} height={48} />
-                    </div>
-                  )}
-                </div>
-              )}
-              </> /* fin !isDuelMode */
-              )}
-            </>
+            </div>
           )}
         </div>
-      )}
+      )}{/* fin panneau Paramètres */}
 
       {!isHost && (
         <div

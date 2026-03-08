@@ -691,7 +691,7 @@ export default function ResultsPage() {
         )}
 
         <button className="btn" onClick={goToLobbyAndMaybeReset}>
-          Retour au lobby
+          Rejouer
         </button>
       </div>
     );
@@ -1001,7 +1001,7 @@ export default function ResultsPage() {
             les mises à jour temps réel ne fassent disparaître le bouton. */}
         {!hasTie && gameEndedLocked && (
           <button className="btn" onClick={goToLobbyAndMaybeReset}>
-            Retour au lobby
+            Rejouer
           </button>
         )}
 

@@ -100,8 +100,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Le mode Duel nécessite exactement 2 joueurs" }, { status: 400 });
     }
   } else {
-    if (!players || players.length < 3) {
-      return NextResponse.json({ error: "Minimum 3 joueurs requis" }, { status: 400 });
+  if (!players || players.length < 3) {
+    return NextResponse.json({ error: "Minimum 3 joueurs requis" }, { status: 400 });
     }
   }
 

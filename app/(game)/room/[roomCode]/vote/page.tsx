@@ -153,11 +153,11 @@ export default function VotePage() {
         () => {
           const rid = roundIdRef.current;
           if (!rid) return;
-          supabaseClient
-            .from("votes")
-            .select("voter_nickname, target_player_id, round_id")
+      supabaseClient
+        .from("votes")
+        .select("voter_nickname, target_player_id, round_id")
             .eq("round_id", rid)
-            .then(({ data }) => setVotes((data as VoteRow[]) || []));
+        .then(({ data }) => setVotes((data as VoteRow[]) || []));
         },
       )
       // 3. Accusations Caméléon en temps réel (remplace pollAccusations)
@@ -165,11 +165,11 @@ export default function VotePage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "chameleon_accusations", filter: `room_code=eq.${room}` },
         () => {
-          supabaseClient
-            .from("chameleon_accusations")
-            .select("accuser_nickname, target_player_id")
-            .eq("room_code", room)
-            .then(({ data }) => setAccusations(((data as any[]) || []) as AccuseRow[]));
+      supabaseClient
+        .from("chameleon_accusations")
+        .select("accuser_nickname, target_player_id")
+        .eq("room_code", room)
+        .then(({ data }) => setAccusations(((data as any[]) || []) as AccuseRow[]));
         },
       )
       // Pilote le poll de secours selon l'état de la connexion Realtime
@@ -334,32 +334,32 @@ export default function VotePage() {
                 👻 Tu es éliminé mais tu peux encore voter depuis l&apos;au-delà !
               </p>
             )}
-            <VotePanel
-              players={voteTargets}
+          <VotePanel
+            players={voteTargets}
               accusationAvailable={!isFantomeSelf && accusationEnabled}
               showAccusation={!isFantomeSelf && canShowAccusation}
-              disableAccusation={isVoteLocked}
-              disableVote={isAccuseLocked || voteSubmitted}
-              hideVoteButton={voteSubmitted}
-              onVote={async (playerId) => {
-                setChoiceLocked(CHOICE_LOCK.VOTE);
-                await fetch("/api/vote", {
-                  method: "POST",
-                  body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
-                });
-                setVoteSubmitted(true);
-              }}
-              onAccuseChameleon={async (playerId) => {
-                setChoiceLocked(CHOICE_LOCK.ACCUSE);
-                await fetch("/api/accuse", {
-                  method: "POST",
-                  body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
-                });
-                setAccusationAvailable(false);
-                setVoteSubmitted(true);
-                setAccusations((prev) => [...prev, { accuser_nickname: nickname, target_player_id: playerId }]);
-              }}
-            />
+            disableAccusation={isVoteLocked}
+            disableVote={isAccuseLocked || voteSubmitted}
+            hideVoteButton={voteSubmitted}
+            onVote={async (playerId) => {
+              setChoiceLocked(CHOICE_LOCK.VOTE);
+              await fetch("/api/vote", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
+              });
+              setVoteSubmitted(true);
+            }}
+            onAccuseChameleon={async (playerId) => {
+              setChoiceLocked(CHOICE_LOCK.ACCUSE);
+              await fetch("/api/accuse", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode, nickname, targetId: playerId }),
+              });
+              setAccusationAvailable(false);
+              setVoteSubmitted(true);
+              setAccusations((prev) => [...prev, { accuser_nickname: nickname, target_player_id: playerId }]);
+            }}
+          />
           </>
         ))}
     </div>

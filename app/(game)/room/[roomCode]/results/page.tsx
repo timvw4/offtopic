@@ -40,27 +40,29 @@ interface ChameleonAccusationRow {
   accuser_nickname: string;
 }
 
-// ─── Algorithme de similarité des dessins (flou + IoU sur masque d'encre) ────
+// ─── Algorithme de similarité des dessins (forme 80% + couleur 20%) ─────────
 //
-// Problème résolu : comparer pixel par pixel exact pénalise deux traits
-// identiques décalés de quelques pixels (ex : même trait horizontal mais
-// légèrement plus haut/bas → score faussement bas).
+// Deux composantes combinées :
 //
-// Solution : appliquer un flou (box blur, rayon 8px) sur le masque d'encre
-// AVANT la comparaison. Le flou étale chaque trait sur ±8 pixels → deux traits
-// décalés de moins de ~8px se chevauchent dans les cartes floues → score élevé.
+//  1. FORME (poids 80%) : IoU sur masques d'encre floutés (box blur rayon 8px).
+//     Le flou tolère les petits décalages de position (~±8px).
+//     Mesure si les deux dessins ont la même structure spatiale.
 //
-// Métrique : IoU (Intersection over Union) sur cartes de densité floues.
-//   sum(min(A_flou, B_flou)) / sum(max(A_flou, B_flou))
+//  2. COULEUR (poids 20%) : distance entre la couleur moyenne des traits.
+//     Compare la teinte dominante utilisée dans chaque dessin.
+//     Ex : rouge vs bleu → pénalité de couleur, même si la forme est identique.
 //
-//   Dessins identiques (même position)           → ~100 %
-//   Dessins quasi-identiques (léger décalage)    → 75–95 %
-//   Dessins similaires (formes proches)          → 40–75 %
-//   Dessins complètement différents              → 5–25 %
+//  Score final = 0.8 × score_forme + 0.2 × score_couleur
+//
+//   Traits identiques, même couleur           → ~100 %
+//   Traits identiques, couleurs différentes   → ~80 %
+//   Formes similaires, même couleur           → ~60–75 %
+//   Dessins complètement différents           → ~5–25 %
 async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
-  const SIZE = 128;  // résolution d'analyse
-  const BLUR_R = 8;  // rayon du flou → tolérance de ±8 pixels de décalage
-  const INK_T = 230; // seuil luminosité : pixel < 230 = encré
+  const SIZE = 128;
+  const BLUR_R = 8;   // tolérance de position ±8 pixels
+  const INK_T = 230;  // seuil luminosité : < 230 = encré
+  const MAX_COLOR_DIST = Math.sqrt(3 * 255 * 255); // distance RGB max ≈ 441.67
 
   const loadImage = (url: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
@@ -71,13 +73,12 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
       img.src = url;
     });
 
-  // Crée un masque d'encre (Float32Array) :
-  // 0 = fond blanc, valeur > 0 = pixel dessiné (intensité ∝ noirceur)
-  const getInkMask = (img: HTMLImageElement): Float32Array => {
+  // Retourne les pixels RGBA bruts ET le masque d'encre en une seule passe sur le canvas
+  const getPixelsAndMask = (img: HTMLImageElement): { pixels: Uint8ClampedArray; mask: Float32Array } => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = SIZE;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#ffffff"; // fond blanc pour gérer la transparence PNG
+    ctx.fillStyle = "#ffffff"; // fond blanc pour neutraliser la transparence PNG
     ctx.fillRect(0, 0, SIZE, SIZE);
     ctx.drawImage(img, 0, 0, SIZE, SIZE);
     const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
@@ -85,14 +86,13 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
     for (let i = 0; i < SIZE * SIZE; i++) {
       const b = i * 4;
       const lum = (data[b] + data[b + 1] + data[b + 2]) / 3;
-      // Noir pur → intensité 1 ; blanc pur → intensité 0
+      // Intensité d'encre : noir pur → 1, blanc pur → 0
       mask[i] = lum < INK_T ? (INK_T - lum) / INK_T : 0;
     }
-    return mask;
+    return { pixels: data, mask };
   };
 
-  // Box blur : chaque pixel devient la moyenne de ses voisins dans un carré
-  // (2R+1)×(2R+1). Étale les traits → deux traits proches se chevauchent.
+  // Box blur : étale chaque trait sur ±BLUR_R pixels → tolère les décalages
   const boxBlur = (mask: Float32Array): Float32Array => {
     const out = new Float32Array(SIZE * SIZE);
     const kernelArea = (2 * BLUR_R + 1) * (2 * BLUR_R + 1);
@@ -112,23 +112,55 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
     return out;
   };
 
+  // Couleur moyenne pondérée des pixels encrés (poids = intensité d'encre)
+  // Donne la teinte dominante du dessin, ex : rouge, bleu, noir...
+  const getAvgInkColor = (
+    pixels: Uint8ClampedArray,
+    mask: Float32Array
+  ): [number, number, number] => {
+    let rSum = 0, gSum = 0, bSum = 0, wSum = 0;
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      const w = mask[i];
+      if (w > 0) {
+        const b = i * 4;
+        rSum += pixels[b]     * w;
+        gSum += pixels[b + 1] * w;
+        bSum += pixels[b + 2] * w;
+        wSum += w;
+      }
+    }
+    // Si aucun pixel encré : gris neutre (pas de pénalité de couleur)
+    if (wSum < 1e-6) return [128, 128, 128];
+    return [rSum / wSum, gSum / wSum, bSum / wSum];
+  };
+
   try {
     const [imgA, imgB] = await Promise.all([loadImage(urlA), loadImage(urlB)]);
 
-    const blurA = boxBlur(getInkMask(imgA));
-    const blurB = boxBlur(getInkMask(imgB));
+    const { pixels: pixA, mask: maskA } = getPixelsAndMask(imgA);
+    const { pixels: pixB, mask: maskB } = getPixelsAndMask(imgB);
 
-    // IoU sur cartes floues : sum(min) / sum(max)
-    // Le fond (valeur 0 partout) ne contribue ni au numérateur ni au dénominateur.
+    // ── 1. Score de FORME (80%) : IoU sur masques floutés ──────────────────
+    const blurA = boxBlur(maskA);
+    const blurB = boxBlur(maskB);
+
     let sumInter = 0;
     let sumUnion = 0;
     for (let i = 0; i < SIZE * SIZE; i++) {
       sumInter += Math.min(blurA[i], blurB[i]);
       sumUnion += Math.max(blurA[i], blurB[i]);
     }
+    const shapeScore = sumUnion < 1e-6 ? 100 : (sumInter / sumUnion) * 100;
 
-    if (sumUnion < 1e-6) return 100; // deux feuilles vierges → 100 %
-    return (sumInter / sumUnion) * 100;
+    // ── 2. Score de COULEUR (20%) : distance entre teintes dominantes ───────
+    const [rA, gA, bA] = getAvgInkColor(pixA, maskA);
+    const [rB, gB, bB] = getAvgInkColor(pixB, maskB);
+    const dr = rA - rB, dg = gA - gB, db = bA - bB;
+    const colorDist = Math.sqrt(dr * dr + dg * dg + db * db) / MAX_COLOR_DIST;
+    const colorScore = (1 - colorDist) * 100;
+
+    // ── Score final combiné ─────────────────────────────────────────────────
+    return 0.8 * shapeScore + 0.2 * colorScore;
   } catch {
     return 0;
   }

@@ -166,7 +166,8 @@ export async function POST(request: Request) {
       })
       .eq("room_code", roomCode);
 
-    const theme = mergedSettings.word_theme || "general";
+    // En mode duel, on utilise toujours le thème "duel" (mots visuels, faits pour être dessinés et comparés)
+    const theme = "duel";
     const { data: themedPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", theme).limit(50);
     let chosen =
       themedPairs && themedPairs.length > 0 ? themedPairs[Math.floor(Math.random() * themedPairs.length)] : undefined;

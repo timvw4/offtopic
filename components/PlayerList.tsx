@@ -60,8 +60,8 @@ export function PlayerList({
                   }}
                 />
               )}
-              <span style={{ fontWeight: 600 }}>
-                {p.nickname} {p.isHost ? "(Hôte)" : ""}
+            <span style={{ fontWeight: 600 }}>
+              {p.nickname} {p.isHost ? "(Hôte)" : ""}
               </span>
             </span>
             {showStatus && (

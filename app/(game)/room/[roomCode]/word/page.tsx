@@ -239,18 +239,18 @@ export default function WordRevealPage() {
   const roleLabel = !dataLoaded
     ? "..."
     : displayedRole === "CAMELEON"
-      ? "Caméléon"
+        ? "Caméléon"
       : displayedRole === "DICTATOR"
-        ? "Dictateur"
+          ? "Dictateur"
         : displayedRole === "FANTOME"
           ? "Fantôme"
           : "Civil"; // CIVIL et HORS_THEME affichent tous les deux "Civil"
   const roleDescription = !dataLoaded
     ? "Chargement..."
     : displayedRole === "CAMELEON"
-      ? "Tu as le même mot que les civils et tu dois te faire passer pour un hors-thème et te faire éliminé pour gagner. attention tu ne dois pas te faire repérer par les autres joueurs."
+        ? "Tu as le même mot que les civils et tu dois te faire passer pour un hors-thème et te faire éliminé pour gagner. attention tu ne dois pas te faire repérer par les autres joueurs."
       : displayedRole === "DICTATOR"
-        ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
+          ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
         : displayedRole === "FANTOME"
           ? "Tu es un Fantôme : joue comme un civil et dessine le mot normalement. Mais si tu es éliminé, tu pourras continuer à voter depuis l'au-delà !"
           : isDuelMode

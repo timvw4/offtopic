@@ -324,11 +324,11 @@ export default function RevealPage() {
               setPhase("RESULTS"); // trigger local immédiat pour l'hôte
             } else {
               // Mode normal : passe en VOTE
-              const resp = await fetch("/api/phase/vote", {
-                method: "POST",
-                body: JSON.stringify({ roomCode: params.roomCode }),
-              });
-              if (resp.ok) {
+            const resp = await fetch("/api/phase/vote", {
+              method: "POST",
+              body: JSON.stringify({ roomCode: params.roomCode }),
+            });
+            if (resp.ok) {
                 setPhase("VOTE");
               }
             }

@@ -9,6 +9,42 @@ import { supabaseClient } from "@/lib/supabaseClient";
 
 type Mode = "create" | "join" | null;
 
+// ─── Contenu du guide ────────────────────────────────────────────────────────
+const ROLES = [
+  {
+    emoji: "👤",
+    name: "Civil",
+    desc: "Tu reçois le mot du thème. Dessine-le sans te faire repérer.",
+  },
+  {
+    emoji: "🕵️",
+    name: "Hors-Thème",
+    desc: "Tu reçois un mot légèrement différent. Fonds-toi dans la masse !",
+  },
+  {
+    emoji: "🦎",
+    name: "Caméléon",
+    desc: "Tu ne connais PAS le mot. Observe les autres et improvise.",
+  },
+  {
+    emoji: "👑",
+    name: "Dictateur",
+    desc: "Tu connais le mot civil ET le mot hors-thème. Sème la confusion.",
+  },
+  {
+    emoji: "👻",
+    name: "Fantôme",
+    desc: "Tu es éliminé mais tu peux encore hanter la partie et voter.",
+  },
+];
+
+const STEPS = [
+  { num: "1", title: "Reçois ton mot", desc: "Chaque joueur reçoit un mot secret selon son rôle." },
+  { num: "2", title: "Dessine !", desc: "Tout le monde dessine son mot en même temps dans le temps imparti." },
+  { num: "3", title: "Révélation", desc: "Les dessins se retournent. Observez, comparez, suspectez." },
+  { num: "4", title: "Vote", desc: "Votez pour éliminer celui qui semble Hors-Thème !" },
+];
+
 function generateRoomCode() {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sans O, I, 0, 1 pour éviter la confusion
   let code = "";
@@ -96,199 +132,202 @@ export default function HomePage() {
   return (
     <div className="home-hero" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
 
-      {/* ─── Bouton "i" fixe en haut à gauche ─── */}
+      {/* ─── Bouton "i" fixe en haut à gauche ─────────────────────────────── */}
       <button
         onClick={() => setShowHelp(true)}
-        aria-label="Règles du jeu"
+        aria-label="Aide / Comment jouer"
         style={{
           position: "fixed",
           top: 14,
           left: 14,
-          zIndex: 900,
-          width: 38,
-          height: 38,
+          zIndex: 1000,
+          width: 34,
+          height: 34,
           borderRadius: "50%",
-          background: "#ffd52d",
-          border: "2px solid rgba(250,204,21,0.4)",
-          color: "#0a0f1a",
-          fontSize: 18,
-          fontWeight: 700,
-          fontStyle: "italic",
-          fontFamily: "'Luckiest Guy', sans-serif",
+          background: "var(--accent)",
+          border: "none",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
-          transition: "transform 0.15s, box-shadow 0.15s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-1px)";
-          e.currentTarget.style.boxShadow = "0 8px 22px rgba(0,0,0,0.4), 0 0 0 3px rgba(250,204,21,0.25)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "0 4px 14px rgba(0,0,0,0.35)";
+          fontSize: 16,
+          fontWeight: 900,
+          color: "#070c16",
+          boxShadow: "0 2px 12px rgba(255,213,45,0.45)",
+          fontFamily: "Georgia, serif",
+          fontStyle: "italic",
+          lineHeight: 1,
+          flexShrink: 0,
         }}
       >
         i
       </button>
 
-      {/* ─── Drawer d'aide (règles du jeu) ─── */}
+      {/* ─── Modal Guide du jeu ────────────────────────────────────────────── */}
       {showHelp && (
         <div
           onClick={() => setShowHelp(false)}
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 1000,
-            background: "rgba(0,0,0,0.55)",
+            zIndex: 2000,
+            background: "rgba(7,12,22,0.85)",
+            backdropFilter: "blur(4px)",
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "center",
-            animation: "fadeIn 0.2s ease",
+            padding: "16px 12px",
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
+              background: "var(--bg-strong)",
+              border: "1px solid var(--stroke)",
+              borderRadius: 18,
               width: "100%",
-              maxWidth: 560,
-              maxHeight: "88vh",
+              maxWidth: 480,
+              maxHeight: "85vh",
               overflowY: "auto",
-              background: "#1a1a2e",
-              borderRadius: "20px 20px 0 0",
-              padding: "24px 22px 36px",
+              padding: "24px 20px 20px",
               display: "grid",
               gap: 20,
-              animation: "slideUp 0.32s cubic-bezier(0.32,0.72,0,1)",
+              position: "relative",
             }}
           >
-            {/* En-tête */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#fff" }}>📖 Comment jouer ?</h2>
-              <button
-                onClick={() => setShowHelp(false)}
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "#fff",
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  fontSize: 16,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ✕
-              </button>
-            </div>
+            {/* Croix fermer */}
+            <button
+              onClick={() => setShowHelp(false)}
+              aria-label="Fermer"
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                background: "rgba(255,255,255,0.08)",
+                border: "none",
+                borderRadius: "50%",
+                width: 30,
+                height: 30,
+                cursor: "pointer",
+                color: "var(--text)",
+                fontSize: 16,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
 
-            {/* ── Section 1 : Jeu classique ── */}
-            <div style={{ display: "grid", gap: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#facc15" }}>🎨 Jeu classique</h3>
-              <p style={{ margin: 0, color: "rgba(255,255,255,0.85)", fontSize: 14, lineHeight: 1.6 }}>
-                Chaque joueur reçoit un mot secret. Les <strong>Civils</strong> reçoivent tous le même mot.
-                Le ou les <strong>Hors-Thème</strong> reçoivent un mot légèrement différent.
+            {/* Titre */}
+            <div>
+              <h2 style={{ fontSize: 20, color: "var(--accent)", marginBottom: 4 }}>🎨 Comment jouer ?</h2>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
+                Off-Topic est un jeu de dessin et de déduction. Chaque joueur a un rôle secret.
               </p>
-              <div style={{ display: "grid", gap: 7 }}>
-                {[
-                  { icon: "✏️", text: "Tout le monde dessine son mot en silence pendant le temps imparti." },
-                  { icon: "🔍", text: "Les dessins sont révélés un à un. Observez bien les différences !" },
-                  { icon: "🗳️", text: "Chaque joueur vote pour désigner le Hors-Thème qu'il a repéré." },
-                  { icon: "🏆", text: "Les Civils gagnent s'ils trouvent le Hors-Thème. Le Hors-Thème gagne s'il passe inaperçu." },
-                ].map(({ icon, text }) => (
-                  <div key={text} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
-                    <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.5 }}>{text}</span>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {/* Séparateur */}
-            <div style={{ height: 1, background: "rgba(255,255,255,0.1)" }} />
-
-            {/* ── Section 2 : Rôles spéciaux ── */}
+            {/* Étapes */}
             <div style={{ display: "grid", gap: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#a78bfa" }}>🎭 Rôles spéciaux</h3>
-              <div style={{ display: "grid", gap: 8 }}>
-                {[
-                  {
-                    role: "🦎 Caméléon",
-                    desc: "Reçoit une feuille blanche. Il ne connaît pas le mot, mais doit faire croire qu'il dessine quelque chose.",
-                  },
-                  {
-                    role: "👑 Dictateur",
-                    desc: "Un Civil qui choisit seul l'ordre de révélation des dessins. Pouvoir tactique !",
-                  },
-                  {
-                    role: "👻 Fantôme",
-                    desc: "Un Civil éliminé au vote. Il peut encore voter aux tours suivants depuis l'au-delà.",
-                  },
-                  {
-                    role: "💀 Fantôme Hors-Thème",
-                    desc: "Un Hors-Thème éliminé. Il connaît le mot civil et peut tenter de faire éliminer un innocent à titre posthume.",
-                  },
-                ].map(({ role, desc }) => (
-                  <div
-                    key={role}
+              {STEPS.map((s) => (
+                <div
+                  key={s.num}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    background: "rgba(255,255,255,0.04)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <span
                     style={{
-                      background: "rgba(255,255,255,0.06)",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      display: "grid",
-                      gap: 3,
+                      background: "var(--accent)",
+                      color: "#070c16",
+                      borderRadius: "50%",
+                      width: 26,
+                      height: 26,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 900,
+                      fontSize: 13,
+                      flexShrink: 0,
                     }}
                   >
-                    <span style={{ fontWeight: 700, fontSize: 13, color: "#e2e8f0" }}>{role}</span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", lineHeight: 1.5 }}>{desc}</span>
+                    {s.num}
+                  </span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{s.title}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{s.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Séparateur */}
+            <div style={{ borderTop: "1px solid var(--stroke)" }} />
+
+            {/* Rôles */}
+            <div>
+              <h3 style={{ fontSize: 15, marginBottom: 10, color: "var(--accent)" }}>Les rôles</h3>
+              <div style={{ display: "grid", gap: 8 }}>
+                {ROLES.map((r) => (
+                  <div
+                    key={r.name}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "flex-start",
+                      background: "rgba(255,255,255,0.04)",
+                      borderRadius: 10,
+                      padding: "9px 12px",
+                    }}
+                  >
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{r.emoji}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{r.name}</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{r.desc}</div>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Séparateur */}
-            <div style={{ height: 1, background: "rgba(255,255,255,0.1)" }} />
+            <div style={{ borderTop: "1px solid var(--stroke)" }} />
 
-            {/* ── Section 3 : Mode Duel ── */}
-            <div style={{ display: "grid", gap: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#f97316" }}>⚔️ Mode Duel (2 joueurs)</h3>
-              <p style={{ margin: 0, color: "rgba(255,255,255,0.85)", fontSize: 14, lineHeight: 1.6 }}>
-                Deux joueurs, un seul mot commun. Dessinez-le chacun de votre côté, puis comparez vos œuvres !
-              </p>
-              <div style={{ display: "grid", gap: 7 }}>
-                {[
-                  { icon: "🎯", text: "Les deux joueurs reçoivent exactement le même mot." },
-                  { icon: "✏️", text: "Chacun dessine le mot de son côté sans voir celui de l'autre." },
-                  { icon: "📊", text: "À la fin, un algorithme compare les deux dessins et affiche un score de ressemblance en pourcentage." },
-                  { icon: "🥇", text: "Plus le score est élevé, plus vos dessins se ressemblent. Visez 100% !" },
-                ].map(({ icon, text }) => (
-                  <div key={text} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
-                    <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.5 }}>{text}</span>
-                  </div>
-                ))}
+            {/* Mode Duel */}
+            <div
+              style={{
+                background: "rgba(255,213,45,0.07)",
+                border: "1px solid rgba(255,213,45,0.2)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                display: "grid",
+                gap: 6,
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 14 }}>⚔️ Mode Duel (2 joueurs)</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
+                Les deux joueurs reçoivent le <strong>même mot</strong> et le dessinent chacun de leur côté. À la fin, un
+                <strong> score de ressemblance</strong> en % est calculé entre les deux dessins. Plus vos traits se ressemblent, plus
+                le score est élevé !
               </div>
             </div>
+
+            {/* Bouton fermer */}
+            <button
+              className="btn btn-compact"
+              onClick={() => setShowHelp(false)}
+              style={{ justifySelf: "center", minWidth: 120 }}
+            >
+              Compris !
+            </button>
           </div>
         </div>
       )}
-
-      {/* ─── Styles d'animation ─── */}
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to   { transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-      `}</style>
       <div
         style={{
           display: "grid",

@@ -102,7 +102,7 @@ export default function HomePage() {
         style={{
           position: "fixed",
           top: 16,
-          right: 16,
+          left: 16,
           zIndex: 100,
           width: 38,
           height: 38,

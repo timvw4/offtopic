@@ -446,7 +446,7 @@ export default function LobbyPage() {
           <div style={{ display: "grid", gap: 2 }}>
             <span style={{ fontWeight: 700, fontSize: 15 }}>⚔️ Mode Duel</span>
             <small style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
-              2 joueurs · chacun reçoit un mot différent · devine le mot de l&apos;autre
+              2 joueurs · même mot · dessinez-le · comparez vos scores de ressemblance
             </small>
           </div>
           <div

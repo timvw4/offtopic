@@ -40,30 +40,26 @@ interface ChameleonAccusationRow {
   accuser_nickname: string;
 }
 
-// ─── Algorithme de similarité des dessins (RGB couleur, pondéré) ─────────────
+// ─── Algorithme de similarité des dessins (RGB, pixels encrés uniquement) ────
 //
 // Fonctionnement :
-//   1. Redimensionne les deux images à 128×128 pixels (haute précision).
-//   2. Pour chaque pixel, calcule la distance euclidienne dans l'espace RGB.
-//      Distance max possible = √(3 × 255²) ≈ 441.67 → normalisée en [0, 1].
-//   3. Applique une pondération × 6 sur les pixels "encrés" (luminosité < 230)
-//      dans au moins l'un des deux dessins, pour que les traits comptent
-//      davantage que le fond blanc commun.
-//   4. Similarité finale = (1 − distance_moyenne_pondérée) × 100.
+//   1. Redimensionne les deux images à 128×128 (fond blanc explicite).
+//   2. Identifie les pixels "encrés" : luminosité < 230 dans AU MOINS l'une
+//      des deux images. Le fond blanc commun est IGNORÉ complètement.
+//   3. Pour chaque pixel encré, calcule la distance euclidienne RGB normalisée.
+//      — Pixel encré dans A mais blanc dans B  → grande distance (forme différente)
+//      — Pixel encré dans les deux, même couleur → distance ≈ 0 (parfaitement similaire)
+//   4. Similarité = (1 − distance_moyenne_sur_pixels_encrés) × 100.
 //
-// Ce calcul est précis, prend en compte les couleurs, et donne des résultats
-// cohérents même si les tracés ne se superposent pas parfaitement.
+// Avantage clé : le fond blanc n'influence plus le score.
+// Deux dessins totalement différents ne peuvent pas scorer 90 %+.
 async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
-  const SIZE = 128; // résolution plus élevée = plus de précision
+  const SIZE = 128;
 
-  // Distance euclidienne max possible dans RGB (√(3×255²))
+  // Distance euclidienne max dans RGB : √(3 × 255²) ≈ 441.67
   const MAX_COLOR_DIST = Math.sqrt(3 * 255 * 255);
 
-  // Poids × 6 pour les pixels dessinés, × 1 pour le fond
-  const INK_WEIGHT = 6;
-  const BG_WEIGHT = 1;
-
-  // Seuil de luminosité en dessous duquel un pixel est considéré "dessiné"
+  // Un pixel est "encré" si sa luminosité moyenne est sous ce seuil
   const INK_THRESHOLD = 230;
 
   const loadImage = (url: string): Promise<HTMLImageElement> =>
@@ -75,14 +71,13 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
       img.src = url;
     });
 
-  // Retourne le tableau RGBA brut d'une image redimensionnée à SIZE×SIZE
+  // Retourne les données RGBA d'une image rendue sur fond blanc à SIZE×SIZE
   const getPixels = (img: HTMLImageElement): Uint8ClampedArray => {
     const canvas = document.createElement("canvas");
     canvas.width = SIZE;
     canvas.height = SIZE;
     const ctx = canvas.getContext("2d")!;
-    // Fond blanc par défaut (certains PNG peuvent avoir un canal alpha)
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#ffffff"; // fond blanc explicite (gère la transparence PNG)
     ctx.fillRect(0, 0, SIZE, SIZE);
     ctx.drawImage(img, 0, 0, SIZE, SIZE);
     return ctx.getImageData(0, 0, SIZE, SIZE).data;
@@ -93,36 +88,35 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
     const pixA = getPixels(imgA);
     const pixB = getPixels(imgB);
 
-    let weightedDiffSum = 0; // somme des (distance × poids)
-    let weightSum = 0;       // somme des poids
+    let totalDist = 0; // cumul des distances normalisées sur pixels encrés
+    let inkCount = 0;  // nombre de pixels encrés (union des deux dessins)
 
     for (let i = 0; i < SIZE * SIZE; i++) {
-      const base = i * 4; // chaque pixel occupe 4 valeurs : R, G, B, A
+      const b = i * 4; // index du canal R dans le tableau RGBA
 
-      const rA = pixA[base], gA = pixA[base + 1], bA = pixA[base + 2];
-      const rB = pixB[base], gB = pixB[base + 1], bB = pixB[base + 2];
+      const rA = pixA[b], gA = pixA[b + 1], bA = pixA[b + 2];
+      const rB = pixB[b], gB = pixB[b + 1], bB = pixB[b + 2];
 
-      // Distance couleur euclidienne entre les deux pixels, normalisée en [0, 1]
-      const dr = rA - rB, dg = gA - gB, db = bA - bB;
-      const colorDist = Math.sqrt(dr * dr + dg * dg + db * db) / MAX_COLOR_DIST;
-
-      // Luminosité de chaque pixel (moyenne des canaux RGB)
+      // Luminosité moyenne de chaque pixel
       const lumA = (rA + gA + bA) / 3;
       const lumB = (rB + gB + bB) / 3;
 
-      // Si l'un ou l'autre pixel est "tracé" → poids fort, sinon fond → poids faible
-      const isInk = lumA < INK_THRESHOLD || lumB < INK_THRESHOLD;
-      const weight = isInk ? INK_WEIGHT : BG_WEIGHT;
+      // On ne traite que les pixels où au moins un dessin a de l'encre
+      if (lumA >= INK_THRESHOLD && lumB >= INK_THRESHOLD) continue;
 
-      weightedDiffSum += colorDist * weight;
-      weightSum += weight;
+      // Distance couleur RGB euclidienne, normalisée en [0, 1]
+      const dr = rA - rB, dg = gA - gB, db = bA - bB;
+      const dist = Math.sqrt(dr * dr + dg * dg + db * db) / MAX_COLOR_DIST;
+
+      totalDist += dist;
+      inkCount++;
     }
 
-    if (weightSum === 0) return 100; // deux canvas vides → 100 %
+    // Aucun pixel encré dans les deux dessins → les deux sont vierges → 100 %
+    if (inkCount === 0) return 100;
 
-    const avgWeightedDiff = weightedDiffSum / weightSum;
-    // Convertit en pourcentage de similarité : 0 différence = 100 %, max différence = 0 %
-    return (1 - avgWeightedDiff) * 100;
+    const avgDist = totalDist / inkCount;
+    return (1 - avgDist) * 100;
   } catch {
     return 0;
   }

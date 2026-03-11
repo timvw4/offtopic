@@ -105,24 +105,31 @@ export default function HomePage() {
           top: 14,
           left: 14,
           zIndex: 900,
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           borderRadius: "50%",
-          background: "rgba(255,255,255,0.15)",
-          border: "1.5px solid rgba(255,255,255,0.35)",
-          color: "#fff",
-          fontSize: 17,
+          background: "#ffd52d",
+          border: "2px solid rgba(250,204,21,0.4)",
+          color: "#0a0f1a",
+          fontSize: 18,
           fontWeight: 700,
           fontStyle: "italic",
+          fontFamily: "'Luckiest Guy', sans-serif",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backdropFilter: "blur(6px)",
-          transition: "background 0.2s",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+          transition: "transform 0.15s, box-shadow 0.15s",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.28)")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.boxShadow = "0 8px 22px rgba(0,0,0,0.4), 0 0 0 3px rgba(250,204,21,0.25)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 4px 14px rgba(0,0,0,0.35)";
+        }}
       >
         i
       </button>

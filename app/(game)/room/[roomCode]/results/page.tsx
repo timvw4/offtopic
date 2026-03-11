@@ -40,27 +40,27 @@ interface ChameleonAccusationRow {
   accuser_nickname: string;
 }
 
-// ─── Algorithme de similarité des dessins (RGB, pixels encrés uniquement) ────
+// ─── Algorithme de similarité des dessins (flou + IoU sur masque d'encre) ────
 //
-// Fonctionnement :
-//   1. Redimensionne les deux images à 128×128 (fond blanc explicite).
-//   2. Identifie les pixels "encrés" : luminosité < 230 dans AU MOINS l'une
-//      des deux images. Le fond blanc commun est IGNORÉ complètement.
-//   3. Pour chaque pixel encré, calcule la distance euclidienne RGB normalisée.
-//      — Pixel encré dans A mais blanc dans B  → grande distance (forme différente)
-//      — Pixel encré dans les deux, même couleur → distance ≈ 0 (parfaitement similaire)
-//   4. Similarité = (1 − distance_moyenne_sur_pixels_encrés) × 100.
+// Problème résolu : comparer pixel par pixel exact pénalise deux traits
+// identiques décalés de quelques pixels (ex : même trait horizontal mais
+// légèrement plus haut/bas → score faussement bas).
 //
-// Avantage clé : le fond blanc n'influence plus le score.
-// Deux dessins totalement différents ne peuvent pas scorer 90 %+.
+// Solution : appliquer un flou (box blur, rayon 8px) sur le masque d'encre
+// AVANT la comparaison. Le flou étale chaque trait sur ±8 pixels → deux traits
+// décalés de moins de ~8px se chevauchent dans les cartes floues → score élevé.
+//
+// Métrique : IoU (Intersection over Union) sur cartes de densité floues.
+//   sum(min(A_flou, B_flou)) / sum(max(A_flou, B_flou))
+//
+//   Dessins identiques (même position)           → ~100 %
+//   Dessins quasi-identiques (léger décalage)    → 75–95 %
+//   Dessins similaires (formes proches)          → 40–75 %
+//   Dessins complètement différents              → 5–25 %
 async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
-  const SIZE = 128;
-
-  // Distance euclidienne max dans RGB : √(3 × 255²) ≈ 441.67
-  const MAX_COLOR_DIST = Math.sqrt(3 * 255 * 255);
-
-  // Un pixel est "encré" si sa luminosité moyenne est sous ce seuil
-  const INK_THRESHOLD = 230;
+  const SIZE = 128;  // résolution d'analyse
+  const BLUR_R = 8;  // rayon du flou → tolérance de ±8 pixels de décalage
+  const INK_T = 230; // seuil luminosité : pixel < 230 = encré
 
   const loadImage = (url: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
@@ -71,56 +71,69 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
       img.src = url;
     });
 
-  // Retourne les données RGBA d'une image rendue sur fond blanc à SIZE×SIZE
-  const getPixels = (img: HTMLImageElement): Uint8ClampedArray => {
+  // Crée un masque d'encre (Float32Array) :
+  // 0 = fond blanc, valeur > 0 = pixel dessiné (intensité ∝ noirceur)
+  const getInkMask = (img: HTMLImageElement): Float32Array => {
     const canvas = document.createElement("canvas");
-    canvas.width = SIZE;
-    canvas.height = SIZE;
+    canvas.width = canvas.height = SIZE;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#ffffff"; // fond blanc explicite (gère la transparence PNG)
+    ctx.fillStyle = "#ffffff"; // fond blanc pour gérer la transparence PNG
     ctx.fillRect(0, 0, SIZE, SIZE);
     ctx.drawImage(img, 0, 0, SIZE, SIZE);
-    return ctx.getImageData(0, 0, SIZE, SIZE).data;
+    const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
+    const mask = new Float32Array(SIZE * SIZE);
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      const b = i * 4;
+      const lum = (data[b] + data[b + 1] + data[b + 2]) / 3;
+      // Noir pur → intensité 1 ; blanc pur → intensité 0
+      mask[i] = lum < INK_T ? (INK_T - lum) / INK_T : 0;
+    }
+    return mask;
+  };
+
+  // Box blur : chaque pixel devient la moyenne de ses voisins dans un carré
+  // (2R+1)×(2R+1). Étale les traits → deux traits proches se chevauchent.
+  const boxBlur = (mask: Float32Array): Float32Array => {
+    const out = new Float32Array(SIZE * SIZE);
+    const kernelArea = (2 * BLUR_R + 1) * (2 * BLUR_R + 1);
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        let sum = 0;
+        for (let dy = -BLUR_R; dy <= BLUR_R; dy++) {
+          for (let dx = -BLUR_R; dx <= BLUR_R; dx++) {
+            const ny = Math.max(0, Math.min(SIZE - 1, y + dy));
+            const nx = Math.max(0, Math.min(SIZE - 1, x + dx));
+            sum += mask[ny * SIZE + nx];
+          }
+        }
+        out[y * SIZE + x] = sum / kernelArea;
+      }
+    }
+    return out;
   };
 
   try {
     const [imgA, imgB] = await Promise.all([loadImage(urlA), loadImage(urlB)]);
-    const pixA = getPixels(imgA);
-    const pixB = getPixels(imgB);
 
-    let totalDist = 0; // cumul des distances normalisées sur pixels encrés
-    let inkCount = 0;  // nombre de pixels encrés (union des deux dessins)
+    const blurA = boxBlur(getInkMask(imgA));
+    const blurB = boxBlur(getInkMask(imgB));
 
+    // IoU sur cartes floues : sum(min) / sum(max)
+    // Le fond (valeur 0 partout) ne contribue ni au numérateur ni au dénominateur.
+    let sumInter = 0;
+    let sumUnion = 0;
     for (let i = 0; i < SIZE * SIZE; i++) {
-      const b = i * 4; // index du canal R dans le tableau RGBA
-
-      const rA = pixA[b], gA = pixA[b + 1], bA = pixA[b + 2];
-      const rB = pixB[b], gB = pixB[b + 1], bB = pixB[b + 2];
-
-      // Luminosité moyenne de chaque pixel
-      const lumA = (rA + gA + bA) / 3;
-      const lumB = (rB + gB + bB) / 3;
-
-      // On ne traite que les pixels où au moins un dessin a de l'encre
-      if (lumA >= INK_THRESHOLD && lumB >= INK_THRESHOLD) continue;
-
-      // Distance couleur RGB euclidienne, normalisée en [0, 1]
-      const dr = rA - rB, dg = gA - gB, db = bA - bB;
-      const dist = Math.sqrt(dr * dr + dg * dg + db * db) / MAX_COLOR_DIST;
-
-      totalDist += dist;
-      inkCount++;
+      sumInter += Math.min(blurA[i], blurB[i]);
+      sumUnion += Math.max(blurA[i], blurB[i]);
     }
 
-    // Aucun pixel encré dans les deux dessins → les deux sont vierges → 100 %
-    if (inkCount === 0) return 100;
-
-    const avgDist = totalDist / inkCount;
-    return (1 - avgDist) * 100;
+    if (sumUnion < 1e-6) return 100; // deux feuilles vierges → 100 %
+    return (sumInter / sumUnion) * 100;
   } catch {
     return 0;
   }
 }
+
 
 export default function ResultsPage() {
   const params = useParams<{ roomCode: string }>();
@@ -793,20 +806,10 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* Boutons */}
-        {isHost ? (
-          <button className="btn" onClick={goToLobbyAndMaybeReset}>
-            🔄 Rejouer
-          </button>
-        ) : (
-          <button
-            className="btn"
-            style={{ background: "#facc15", color: "#0b0f1a", fontWeight: 700 }}
-            onClick={goToLobbyAndMaybeReset}
-          >
-            Retour au lobby
-          </button>
-        )}
+        {/* Les deux joueurs voient le bouton Rejouer */}
+        <button className="btn" onClick={goToLobbyAndMaybeReset}>
+          🔄 Rejouer
+        </button>
       </div>
     );
   }

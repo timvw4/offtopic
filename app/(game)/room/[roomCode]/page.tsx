@@ -92,7 +92,7 @@ export default function LobbyPage() {
     { value: "sports", label: "Sports" },
     { value: "fantastique", label: "Fantastique" },
     { value: "metiers", label: "Métiers" },
-    { value: "pop_culture", label: "🎬 Pop Culture" },
+    { value: "pop_culture", label: "Pop-Culture" },
   ];
 
   const themeLabel = themes.find((t) => t.value === selectedTheme)?.label ?? "Général";

@@ -287,13 +287,22 @@ export async function POST(request: Request) {
 
   const theme = mergedSettings.word_theme || "general";
 
-  // Pick random pair dans le thème (fallback sur general si vide)
-  const { data: themedPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", theme).limit(50);
+  // Pick random pair dans le thème.
+  // Si le thème est "general" : on pioche dans TOUS les thèmes (sauf "duel" réservé au mode duel)
+  // pour que le thème général soit vraiment varié.
+  let themedPairsQuery = supabaseAdmin.from("word_pairs").select("*").limit(200);
+  if (theme === "general") {
+    themedPairsQuery = themedPairsQuery.neq("theme", "duel");
+  } else {
+    themedPairsQuery = themedPairsQuery.eq("theme", theme);
+  }
+  const { data: themedPairs } = await themedPairsQuery;
   let chosen =
     themedPairs && themedPairs.length > 0 ? themedPairs[Math.floor(Math.random() * themedPairs.length)] : undefined;
 
   if (!chosen) {
-    const { data: fallbackPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", "general").limit(50);
+    // Fallback ultime : on prend n'importe quel mot hors duel
+    const { data: fallbackPairs } = await supabaseAdmin.from("word_pairs").select("*").neq("theme", "duel").limit(50);
     chosen =
       fallbackPairs && fallbackPairs.length > 0
         ? fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)]

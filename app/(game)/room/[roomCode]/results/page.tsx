@@ -40,11 +40,31 @@ interface ChameleonAccusationRow {
   accuser_nickname: string;
 }
 
-// ─── Algorithme de similarité des dessins (Jaccard sur pixels tracés) ────────
-// Charge deux images via Canvas 64×64, isole les pixels "encrés" (luminosité < 200)
-// et calcule similarité = intersection / union des pixels tracés × 100.
+// ─── Algorithme de similarité des dessins (RGB couleur, pondéré) ─────────────
+//
+// Fonctionnement :
+//   1. Redimensionne les deux images à 128×128 pixels (haute précision).
+//   2. Pour chaque pixel, calcule la distance euclidienne dans l'espace RGB.
+//      Distance max possible = √(3 × 255²) ≈ 441.67 → normalisée en [0, 1].
+//   3. Applique une pondération × 6 sur les pixels "encrés" (luminosité < 230)
+//      dans au moins l'un des deux dessins, pour que les traits comptent
+//      davantage que le fond blanc commun.
+//   4. Similarité finale = (1 − distance_moyenne_pondérée) × 100.
+//
+// Ce calcul est précis, prend en compte les couleurs, et donne des résultats
+// cohérents même si les tracés ne se superposent pas parfaitement.
 async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
-  const SIZE = 64;
+  const SIZE = 128; // résolution plus élevée = plus de précision
+
+  // Distance euclidienne max possible dans RGB (√(3×255²))
+  const MAX_COLOR_DIST = Math.sqrt(3 * 255 * 255);
+
+  // Poids × 6 pour les pixels dessinés, × 1 pour le fond
+  const INK_WEIGHT = 6;
+  const BG_WEIGHT = 1;
+
+  // Seuil de luminosité en dessous duquel un pixel est considéré "dessiné"
+  const INK_THRESHOLD = 230;
 
   const loadImage = (url: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
@@ -55,38 +75,54 @@ async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
       img.src = url;
     });
 
-  const toGrayscale = (img: HTMLImageElement): Uint8ClampedArray => {
+  // Retourne le tableau RGBA brut d'une image redimensionnée à SIZE×SIZE
+  const getPixels = (img: HTMLImageElement): Uint8ClampedArray => {
     const canvas = document.createElement("canvas");
     canvas.width = SIZE;
     canvas.height = SIZE;
     const ctx = canvas.getContext("2d")!;
+    // Fond blanc par défaut (certains PNG peuvent avoir un canal alpha)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, SIZE, SIZE);
     ctx.drawImage(img, 0, 0, SIZE, SIZE);
-    const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
-    const gray = new Uint8ClampedArray(SIZE * SIZE);
-    for (let i = 0; i < SIZE * SIZE; i++) {
-      // Conversion RGB → niveaux de gris (pondération standard)
-      gray[i] = Math.round(0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]);
-    }
-    return gray;
+    return ctx.getImageData(0, 0, SIZE, SIZE).data;
   };
 
   try {
     const [imgA, imgB] = await Promise.all([loadImage(urlA), loadImage(urlB)]);
-    const grayA = toGrayscale(imgA);
-    const grayB = toGrayscale(imgB);
+    const pixA = getPixels(imgA);
+    const pixB = getPixels(imgB);
 
-    const THRESHOLD = 200; // pixel considéré "tracé" si luminosité < 200
-    let intersection = 0;
-    let union = 0;
+    let weightedDiffSum = 0; // somme des (distance × poids)
+    let weightSum = 0;       // somme des poids
+
     for (let i = 0; i < SIZE * SIZE; i++) {
-      const inkA = grayA[i] < THRESHOLD;
-      const inkB = grayB[i] < THRESHOLD;
-      if (inkA || inkB) union++;
-      if (inkA && inkB) intersection++;
+      const base = i * 4; // chaque pixel occupe 4 valeurs : R, G, B, A
+
+      const rA = pixA[base], gA = pixA[base + 1], bA = pixA[base + 2];
+      const rB = pixB[base], gB = pixB[base + 1], bB = pixB[base + 2];
+
+      // Distance couleur euclidienne entre les deux pixels, normalisée en [0, 1]
+      const dr = rA - rB, dg = gA - gB, db = bA - bB;
+      const colorDist = Math.sqrt(dr * dr + dg * dg + db * db) / MAX_COLOR_DIST;
+
+      // Luminosité de chaque pixel (moyenne des canaux RGB)
+      const lumA = (rA + gA + bA) / 3;
+      const lumB = (rB + gB + bB) / 3;
+
+      // Si l'un ou l'autre pixel est "tracé" → poids fort, sinon fond → poids faible
+      const isInk = lumA < INK_THRESHOLD || lumB < INK_THRESHOLD;
+      const weight = isInk ? INK_WEIGHT : BG_WEIGHT;
+
+      weightedDiffSum += colorDist * weight;
+      weightSum += weight;
     }
-    // Si aucun pixel tracé dans les deux dessins → 100 % (deux feuilles blanches)
-    if (union === 0) return 100;
-    return (intersection / union) * 100;
+
+    if (weightSum === 0) return 100; // deux canvas vides → 100 %
+
+    const avgWeightedDiff = weightedDiffSum / weightSum;
+    // Convertit en pourcentage de similarité : 0 différence = 100 %, max différence = 0 %
+    return (1 - avgWeightedDiff) * 100;
   } catch {
     return 0;
   }

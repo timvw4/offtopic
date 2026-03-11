@@ -150,12 +150,10 @@ export async function POST(request: Request) {
   ]);
 
   // ── Mode Duel (2 joueurs) ────────────────────────────────────────────────
-  // On assigne directement 1 CIVIL + 1 HORS_THEME sans aucun rôle spécial.
+  // Les deux joueurs reçoivent le rôle CIVIL avec le MÊME mot.
+  // La comparaison se fait par similarité visuelle des dessins, pas par devinette.
   if (isDuelMode) {
-    const duelShuffled = shuffle(players.map((p) => p.id));
-    const [civilId, htId] = duelShuffled;
-
-    // Reset des rôles
+    // Reset des rôles — tous CIVIL, pas de HT
     await supabaseAdmin
       .from("players")
       .update({
@@ -168,9 +166,6 @@ export async function POST(request: Request) {
       })
       .eq("room_code", roomCode);
 
-    // Attribue le rôle HORS_THEME au 2ème joueur (sans qu'il le sache — c'est juste son mot qui change)
-    await supabaseAdmin.from("players").update({ role: "HORS_THEME" }).eq("id", htId);
-
     const theme = mergedSettings.word_theme || "general";
     const { data: themedPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", theme).limit(50);
     let chosen =
@@ -180,11 +175,14 @@ export async function POST(request: Request) {
       chosen = fallbackPairs && fallbackPairs.length > 0 ? fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)] : undefined;
     }
 
+    // On stocke le même mot dans word_civil et word_hors_theme pour la compatibilité du schéma
+    const duelWord = chosen?.word_fr_civil || "chat";
+
     await supabaseAdmin.from("rounds").insert({
       room_code: roomCode,
       phase: "WORD",
-      word_civil: chosen?.word_fr_civil || "chat",
-      word_hors_theme: chosen?.word_fr_hors_theme || "chien",
+      word_civil: duelWord,
+      word_hors_theme: duelWord,
       timer_seconds: timerSeconds,
       tie_player_ids: null,
       draw_starts_at: null,
@@ -195,7 +193,7 @@ export async function POST(request: Request) {
       .from("rooms")
       .update({
         current_phase: "WORD",
-        hors_theme_count: 1,
+        hors_theme_count: 0,
         has_cameleon: false,
         has_dictator: false,
         has_fantome: false,
@@ -207,7 +205,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       duel: true,
-      roles: { civil: civilId, hors_theme: htId },
+      word: duelWord,
     });
   }
   // ── Fin mode Duel ────────────────────────────────────────────────────────

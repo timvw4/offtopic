@@ -40,6 +40,58 @@ interface ChameleonAccusationRow {
   accuser_nickname: string;
 }
 
+// ─── Algorithme de similarité des dessins (Jaccard sur pixels tracés) ────────
+// Charge deux images via Canvas 64×64, isole les pixels "encrés" (luminosité < 200)
+// et calcule similarité = intersection / union des pixels tracés × 100.
+async function computeSimilarity(urlA: string, urlB: string): Promise<number> {
+  const SIZE = 64;
+
+  const loadImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+
+  const toGrayscale = (img: HTMLImageElement): Uint8ClampedArray => {
+    const canvas = document.createElement("canvas");
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
+    const gray = new Uint8ClampedArray(SIZE * SIZE);
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      // Conversion RGB → niveaux de gris (pondération standard)
+      gray[i] = Math.round(0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]);
+    }
+    return gray;
+  };
+
+  try {
+    const [imgA, imgB] = await Promise.all([loadImage(urlA), loadImage(urlB)]);
+    const grayA = toGrayscale(imgA);
+    const grayB = toGrayscale(imgB);
+
+    const THRESHOLD = 200; // pixel considéré "tracé" si luminosité < 200
+    let intersection = 0;
+    let union = 0;
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      const inkA = grayA[i] < THRESHOLD;
+      const inkB = grayB[i] < THRESHOLD;
+      if (inkA || inkB) union++;
+      if (inkA && inkB) intersection++;
+    }
+    // Si aucun pixel tracé dans les deux dessins → 100 % (deux feuilles blanches)
+    if (union === 0) return 100;
+    return (intersection / union) * 100;
+  } catch {
+    return 0;
+  }
+}
+
 export default function ResultsPage() {
   const params = useParams<{ roomCode: string }>();
   const search = useSearchParams();
@@ -59,13 +111,20 @@ export default function ResultsPage() {
   const [wordHorsTheme, setWordHorsTheme] = useState<string>("");
   // Mode Duel
   const [isDuelMode, setIsDuelMode] = useState(false);
-  const [duelGuesses, setDuelGuesses] = useState<{ player_nickname: string; guessed_word: string; is_correct: boolean }[]>([]);
+  const [duelDrawings, setDuelDrawings] = useState<{ nickname: string; data_url: string }[]>([]);
+  const [similarity, setSimilarity] = useState<number | null>(null);
   // Une fois la partie terminée, on verrouille cet état pour qu'aucune mise à jour
   // temps réel (ex : un joueur qui rejoint le lobby et réinitialise is_eliminated)
   // ne fasse disparaître le bouton "Retour au lobby" pour les autres joueurs.
   const [gameEndedLocked, setGameEndedLocked] = useState(false);
   const tooltipTimeout = useRef<NodeJS.Timeout | null>(null);
   const resolvedRef = useRef(false);
+
+  // Calcule la similarité dès que les deux dessins sont chargés en mode Duel
+  useEffect(() => {
+    if (!isDuelMode || duelDrawings.length < 2) return;
+    computeSimilarity(duelDrawings[0].data_url, duelDrawings[1].data_url).then(setSimilarity);
+  }, [isDuelMode, duelDrawings]);
 
   const clearTooltipTimeout = () => {
     if (tooltipTimeout.current) {
@@ -151,11 +210,12 @@ export default function ResultsPage() {
         setIsDuelMode(!!data?.is_duel_mode);
       });
 
+    // Charge les dessins pour le mode Duel (calcul de similarité)
     supabaseClient
-      .from("duel_guesses")
-      .select("player_nickname, guessed_word, is_correct")
+      .from("drawings")
+      .select("nickname, data_url")
       .eq("room_code", room)
-      .then(({ data }) => setDuelGuesses((data as any[]) || []));
+      .then(({ data }) => setDuelDrawings((data as any[]) || []));
 
     // Fonctions partagées entre le poll de secours et les callbacks Realtime de repli
     const fetchPhase = () => {
@@ -583,116 +643,140 @@ export default function ResultsPage() {
   }
 
   // ── Affichage Mode Duel ──────────────────────────────────────────────────
-  if (isDuelMode && duelGuesses.length > 0) {
-    // Reconstruit les données pour l'affichage duel
-    const winners = duelGuesses.filter((g) => g.is_correct).map((g) => g.player_nickname);
-    const nobody = winners.length === 0;
-    const both = winners.length === 2;
+  if (isDuelMode) {
+    // Score de ressemblance affiché avec 2 décimales
+    const simDisplay = similarity !== null ? similarity.toFixed(2) : null;
+
+    // Couleur du score selon le niveau
+    const simColor =
+      similarity === null
+        ? "#facc15"
+        : similarity >= 70
+          ? "#22c55e"
+          : similarity >= 40
+            ? "#facc15"
+            : "#f87171";
+
+    // Commentaire selon le score
+    const simComment =
+      similarity === null
+        ? "Calcul en cours…"
+        : similarity >= 80
+          ? "Vous avez l'esprit parfaitement synchronisé ! 🤯"
+          : similarity >= 60
+            ? "Très belle ressemblance ! Vous pensez pareil. 🎨"
+            : similarity >= 40
+              ? "Pas mal du tout ! Les grandes lignes y sont. 👀"
+              : similarity >= 20
+                ? "Vous avez chacun votre style… 😅"
+                : "Vous avez dessiné deux choses complètement différentes ! 🙈";
 
     return (
       <div style={{ display: "grid", gap: 16 }}>
         <h2 style={{ margin: 0 }}>⚔️ Résultat du Duel</h2>
 
-        {/* Résumé gagnant */}
+        {/* Score de ressemblance */}
         <div
           className="card result-pop"
-          style={{ display: "grid", gap: 10, textAlign: "center", padding: "20px 16px" }}
+          style={{ display: "grid", gap: 8, textAlign: "center", padding: "24px 16px" }}
         >
-          <span style={{ fontSize: 36 }}>
-            {nobody ? "🤝" : both ? "🎉" : "🏆"}
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>
+            Score de ressemblance
           </span>
-          <strong style={{ fontSize: 20 }}>
-            {nobody
-              ? "Aucun joueur n'a deviné !"
-              : both
-                ? "Les deux joueurs ont deviné !"
-                : `${winners[0]} a gagné !`}
+          <strong
+            style={{
+              fontSize: 56,
+              fontWeight: 800,
+              color: simColor,
+              lineHeight: 1,
+              transition: "color 0.5s ease",
+            }}
+          >
+            {simDisplay !== null ? `${simDisplay} %` : "…"}
           </strong>
-          <p style={{ margin: 0, color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
-            {nobody
-              ? "Personne n'a trouvé le mot de l'autre."
-              : both
-                ? "Excellent duel — vous avez tous les deux trouvé le bon mot."
-                : "Quelle déduction ! Bravo !"}
+          <p style={{ margin: 0, color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
+            {simComment}
           </p>
         </div>
 
-        {/* Détail des devinettes */}
-        <div className="card" style={{ display: "grid", gap: 10 }}>
-          <strong style={{ fontSize: 14 }}>Les réponses</strong>
-          {duelGuesses.map((g) => {
-            // Retrouve le mot correct pour ce joueur
-            const myPlayer = players.find((p) => p.nickname === g.player_nickname);
-            const correctWord = myPlayer?.role === "CIVIL" ? wordHorsTheme : wordCivil;
-            return (
-              <div
-                key={g.player_nickname}
-                style={{
-                  display: "grid",
-                  gap: 4,
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  background: g.is_correct ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.04)",
-                  border: g.is_correct ? "1.5px solid #22c55e" : "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong style={{ fontSize: 15 }}>{g.player_nickname}</strong>
-                  <span style={{ fontSize: 20 }}>{g.is_correct ? "✅" : "❌"}</span>
-                </div>
-                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.65)" }}>
-                  A répondu :{" "}
-                  <span style={{ fontWeight: 700, color: g.is_correct ? "#22c55e" : "#f87171" }}>
-                    &ldquo;{g.guessed_word}&rdquo;
-                  </span>
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-                  Bonne réponse : <span style={{ color: "#facc15", fontWeight: 600 }}>{correctWord}</span>
-                </p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Les mots du tour */}
-        {(wordCivil || wordHorsTheme) && (
-          <div className="card" style={{ display: "grid", gap: 8 }}>
-            <strong style={{ fontSize: 14 }}>Les mots du tour</strong>
-            {players.map((p) => (
-              <div
-                key={p.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <span style={{ fontWeight: 600 }}>{p.nickname}</span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#facc15",
-                    background: "rgba(250,204,21,0.1)",
-                    border: "1px solid rgba(250,204,21,0.3)",
-                    borderRadius: 6,
-                    padding: "2px 8px",
-                  }}
-                >
-                  {p.role === "HORS_THEME" ? wordHorsTheme : wordCivil}
-                </span>
-              </div>
-            ))}
+        {/* Mot du tour */}
+        {wordCivil && (
+          <div
+            className="card"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "14px 16px",
+            }}
+          >
+            <span style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>Le mot à dessiner était</span>
+            <span
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: "#facc15",
+                background: "rgba(250,204,21,0.1)",
+                border: "1px solid rgba(250,204,21,0.3)",
+                borderRadius: 8,
+                padding: "4px 12px",
+              }}
+            >
+              {wordCivil}
+            </span>
           </div>
         )}
 
-        <button className="btn" onClick={goToLobbyAndMaybeReset}>
-          Rejouer
-        </button>
+        {/* Les deux dessins côte à côte */}
+        {duelDrawings.length >= 2 && (
+          <div className="card" style={{ display: "grid", gap: 12 }}>
+            <strong style={{ fontSize: 14 }}>Les dessins</strong>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {duelDrawings.map((d) => (
+                <div key={d.nickname} style={{ display: "grid", gap: 6 }}>
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      borderRadius: 10,
+                      overflow: "hidden",
+                      background: "#ffffff",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    <Image
+                      src={d.data_url}
+                      alt={`Dessin de ${d.nickname}`}
+                      fill
+                      sizes="160px"
+                      style={{ objectFit: "contain" }}
+                    />
+                  </div>
+                  <span style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: "#facc15" }}>
+                    {d.nickname}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Boutons */}
+        {isHost ? (
+          <button className="btn" onClick={goToLobbyAndMaybeReset}>
+            🔄 Rejouer
+          </button>
+        ) : (
+          <button
+            className="btn"
+            style={{ background: "#facc15", color: "#0b0f1a", fontWeight: 700 }}
+            onClick={goToLobbyAndMaybeReset}
+          >
+            Retour au lobby
+          </button>
+        )}
       </div>
     );
   }

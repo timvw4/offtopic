@@ -254,7 +254,7 @@ export default function WordRevealPage() {
         : displayedRole === "FANTOME"
           ? "Tu es un Fantôme : joue comme un civil et dessine le mot normalement. Mais si tu es éliminé, tu pourras continuer à voter depuis l'au-delà !"
           : isDuelMode
-            ? "Dessine ton mot ! Après avoir vu vos dessins, vous devrez chacun deviner le mot que l'autre a dessiné. Sois précis... mais pas trop !"
+            ? "Dessine ce mot le plus fidèlement possible ! Vos deux dessins seront comparés et un score de ressemblance vous sera révélé. Qui a le meilleur coup de crayon ?"
             : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème."; // CIVIL et HORS_THEME voient la même description
   const roleMedia =
     dataLoaded && displayedRole === "CAMELEON"

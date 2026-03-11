@@ -195,15 +195,14 @@ export default function RevealPage() {
     supabaseClient.from("rooms").update({ current_phase: "REVEAL" }).eq("code", room).then();
   }, [isHost, params.roomCode, phase]);
 
-  // Redirige tout le monde quand la phase passe à VOTE
-  // En mode Duel → on va sur /guess au lieu de /vote
+  // Redirige tout le monde quand la phase change
+  // En mode Duel : RESULTS → /results directement (pas de vote ni de devinette)
+  // En mode normal : VOTE → /vote
   useEffect(() => {
-    if (phase === "VOTE") {
-      if (isDuelMode) {
-        router.replace(`/room/${params.roomCode}/guess?nickname=${encodeURIComponent(nickname)}`);
-      } else {
+    if (isDuelMode && phase === "RESULTS") {
+      router.replace(`/room/${params.roomCode}/results?nickname=${encodeURIComponent(nickname)}`);
+    } else if (!isDuelMode && phase === "VOTE") {
       router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
-      }
     }
   }, [phase, nickname, params.roomCode, router, isDuelMode]);
 
@@ -316,21 +315,29 @@ export default function RevealPage() {
           disabled={!revealUnlocked}
           style={{ opacity: revealUnlocked ? 1 : 0.5 }}
           onClick={async () => {
-            // Met à jour la phase pour synchroniser tous les joueurs
-            // En mode Duel, la phase passe à VOTE mais la redirection va vers /guess
-            const resp = await fetch("/api/phase/vote", {
-              method: "POST",
-              body: JSON.stringify({ roomCode: params.roomCode }),
-            });
-            if (resp.ok) {
-              setPhase("VOTE"); // force le trigger local immédiat pour l'hôte
+            if (isDuelMode) {
+              // En mode Duel : passe directement en RESULTS, sans vote ni devinette
+              await supabaseClient
+                .from("rooms")
+                .update({ current_phase: "RESULTS" })
+                .eq("code", params.roomCode);
+              setPhase("RESULTS"); // trigger local immédiat pour l'hôte
+            } else {
+              // Mode normal : passe en VOTE
+              const resp = await fetch("/api/phase/vote", {
+                method: "POST",
+                body: JSON.stringify({ roomCode: params.roomCode }),
+              });
+              if (resp.ok) {
+                setPhase("VOTE");
+              }
             }
           }}
         >
-          {isDuelMode ? "⚔️ Passer à la devinette" : "Passer au vote"}
+          {isDuelMode ? "⚔️ Voir les résultats" : "Passer au vote"}
         </button>
       ) : (
-        <p>En attente de l&apos;hôte pour {isDuelMode ? "passer à la devinette" : "passer au vote"}…</p>
+        <p>En attente de l&apos;hôte pour {isDuelMode ? "voir les résultats" : "passer au vote"}…</p>
       )}
       {!revealUnlocked && (
         <p>

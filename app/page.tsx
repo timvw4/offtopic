@@ -12,29 +12,24 @@ type Mode = "create" | "join" | null;
 // ─── Contenu du guide ────────────────────────────────────────────────────────
 const ROLES = [
   {
-    emoji: "👤",
     name: "Civil",
-    desc: "Tu reçois le mot du thème. Dessine-le sans te faire repérer.",
+    desc: "Tu reçois le mot du thème. Dessine-le pour que les autres Civils te reconnaissent, sans te faire piéger par les Hors-Thème. Ton but : faire éliminer un Hors-Thème.",
   },
   {
-    emoji: "🕵️",
     name: "Hors-Thème",
-    desc: "Tu reçois un mot légèrement différent. Fonds-toi dans la masse !",
+    desc: "Tu reçois un mot légèrement différent de celui des Civils, mais tu es affiché comme « Civil » — tu ne sais même pas que ton mot est différent ! Dessine naturellement et espère passer inaperçu.",
   },
   {
-    emoji: "🦎",
     name: "Caméléon",
-    desc: "Tu ne connais PAS le mot. Observe les autres et improvise.",
+    desc: "Surprise : tu reçois le même mot que les Civils. Mais ton but est de te faire éliminer ! Joue de façon suspecte pour convaincre les autres que tu es Hors-Thème, sans te faire démasquer trop tôt.",
   },
   {
-    emoji: "👑",
     name: "Dictateur",
-    desc: "Tu connais le mot civil ET le mot hors-thème. Sème la confusion.",
+    desc: "Tu joues comme un Civil, mais tu as une immunité : la première fois que la majorité vote contre toi, tu survives et ton vote suivant compte double. La deuxième fois, tu es éliminé.",
   },
   {
-    emoji: "👻",
     name: "Fantôme",
-    desc: "Tu es éliminé mais tu peux encore hanter la partie et voter.",
+    desc: "Tu joues normalement comme un Civil. Mais si tu es éliminé, tu ne quittes pas la partie : tu continues à voter depuis l'au-delà pour influencer le résultat final !",
   },
 ];
 
@@ -42,7 +37,7 @@ const STEPS = [
   { num: "1", title: "Reçois ton mot", desc: "Chaque joueur reçoit un mot secret selon son rôle." },
   { num: "2", title: "Dessine !", desc: "Tout le monde dessine son mot en même temps dans le temps imparti." },
   { num: "3", title: "Révélation", desc: "Les dessins se retournent. Observez, comparez, suspectez." },
-  { num: "4", title: "Vote", desc: "Votez pour éliminer celui qui semble Hors-Thème !" },
+  { num: "4", title: "Vote", desc: "Votez pour éliminer celui qui semble Hors-Thème." },
 ];
 
 function generateRoomCode() {
@@ -221,7 +216,7 @@ export default function HomePage() {
 
             {/* Titre */}
             <div>
-              <h2 style={{ fontSize: 20, color: "var(--accent)", marginBottom: 4 }}>🎨 Comment jouer ?</h2>
+              <h2 style={{ fontSize: 20, color: "var(--accent)", marginBottom: 4 }}>Comment jouer ?</h2>
               <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
                 Off-Topic est un jeu de dessin et de déduction. Chaque joueur a un rôle secret.
               </p>
@@ -277,19 +272,13 @@ export default function HomePage() {
                   <div
                     key={r.name}
                     style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "flex-start",
                       background: "rgba(255,255,255,0.04)",
                       borderRadius: 10,
                       padding: "9px 12px",
                     }}
                   >
-                    <span style={{ fontSize: 20, flexShrink: 0 }}>{r.emoji}</span>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{r.name}</div>
-                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{r.desc}</div>
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{r.desc}</div>
                   </div>
                 ))}
               </div>

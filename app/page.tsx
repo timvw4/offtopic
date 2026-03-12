@@ -302,9 +302,24 @@ export default function HomePage() {
                 transition: "opacity 0.6s ease, transform 0.6s ease",
               }}
             >
-              <Image src={titleLogo} alt="OFF-TOPIC" priority style={{ width: "100%", height: "auto" }} sizes="300px" />
-            </div>
+            <Image src={titleLogo} alt="OFF-TOPIC" priority style={{ width: "100%", height: "auto" }} sizes="300px" />
           </div>
+
+          {/* Tagline sous le logo */}
+          <p
+            style={{
+              margin: "-36px 0 0",
+              color: "rgba(255,255,255,0.55)",
+              fontSize: 14,
+              letterSpacing: 1.5,
+              textTransform: "uppercase",
+              opacity: mounted ? 1 : 0,
+              transition: "opacity 0.7s ease 0.2s",
+            }}
+          >
+            Dessine. Trompe. Survive.
+          </p>
+        </div>
           <div
             className="panel"
             style={{

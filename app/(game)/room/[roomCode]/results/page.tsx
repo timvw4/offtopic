@@ -40,6 +40,49 @@ interface ChameleonAccusationRow {
   accuser_nickname: string;
 }
 
+// Indique si le round n'a pas encore été traité par /api/resolve.
+function isRoundUnresolved(data: {
+  last_eliminated_player_id: string | null;
+  tie_player_ids: string[] | null;
+  dictator_survived: boolean | null;
+}) {
+  if (data.dictator_survived === true) return false;
+  if (data.last_eliminated_player_id) return false;
+  if (Array.isArray(data.tie_player_ids) && data.tie_player_ids.length > 0) return false;
+  return true;
+}
+
+function refreshRoundResult(roomCode: string, setters: {
+  setPlayers: (p: Player[]) => void;
+  setResult: (r: ResultRow | null) => void;
+  setTieIds: (ids: string[]) => void;
+  setRoundId: (id: string | null) => void;
+}) {
+  supabaseClient
+    .from("players")
+    .select("*")
+    .eq("room_code", roomCode)
+    .then(({ data }) => setters.setPlayers((data || []).map(mapPlayerRow)));
+  supabaseClient
+    .from("rounds")
+    .select("id, last_eliminated_player_id, last_eliminated_is_chameleon, tie_player_ids, dictator_survived")
+    .eq("room_code", roomCode)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+    .then(({ data }) => {
+      if (!data) return;
+      setters.setResult({
+        eliminated_player_id: data.last_eliminated_player_id,
+        is_chameleon: data.last_eliminated_is_chameleon,
+        round_id: data.id,
+        dictator_survived: data.dictator_survived,
+      });
+      setters.setTieIds((data.tie_player_ids as string[]) || []);
+      setters.setRoundId(data.id);
+    });
+}
+
 // ─── Algorithme de similarité des dessins (forme 80% + couleur 20%) ─────────
 //
 // Deux composantes combinées :
@@ -451,47 +494,35 @@ export default function ResultsPage() {
       router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
       return;
     }
-    if (phase === "RESULTS" && !resolvedRef.current) {
+    if (phase === "RESULTS" && !resolvedRef.current && !isDuelMode) {
       resolvedRef.current = true;
-      fetch("/api/resolve", {
-        method: "POST",
-        body: JSON.stringify({ roomCode: params.roomCode }),
-      })
-        .then((r) => r.json())
-        .then((r) => {
-          if (r?.tie === true && Array.isArray(r.tiePlayerIds)) {
-            setTieIds(r.tiePlayerIds);
-          } else {
-            setTieIds([]);
+      // Secours uniquement : la résolution normale est déclenchée par le leader sur la page vote.
+      supabaseClient
+        .from("rounds")
+        .select("id, last_eliminated_player_id, last_eliminated_is_chameleon, tie_player_ids, dictator_survived")
+        .eq("room_code", params.roomCode)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data || !isRoundUnresolved(data)) {
+            refreshRoundResult(params.roomCode, { setPlayers, setResult, setTieIds, setRoundId });
+            return;
           }
-          // Force un refresh joueurs/rounds pour refléter l'élimination
-          supabaseClient
-            .from("players")
-            .select("*")
-            .eq("room_code", params.roomCode)
-            .then(({ data }) => setPlayers((data || []).map(mapPlayerRow)));
-          supabaseClient
-            .from("rounds")
-            .select("id, last_eliminated_player_id, last_eliminated_is_chameleon, tie_player_ids, dictator_survived")
-            .eq("room_code", params.roomCode)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-              if (data) {
-                setResult({
-                  eliminated_player_id: data.last_eliminated_player_id,
-                  is_chameleon: data.last_eliminated_is_chameleon,
-                  round_id: data.id,
-                  dictator_survived: data.dictator_survived,
-                });
-                setTieIds((data.tie_player_ids as string[]) || []);
-                setRoundId(data.id);
+          fetch("/api/resolve", {
+            method: "POST",
+            body: JSON.stringify({ roomCode: params.roomCode }),
+          })
+            .then((r) => r.json())
+            .then((r) => {
+              if (r?.tie === true && Array.isArray(r.tiePlayerIds)) {
+                setTieIds(r.tiePlayerIds);
               }
+              refreshRoundResult(params.roomCode, { setPlayers, setResult, setTieIds, setRoundId });
+            })
+            .catch(() => {
+              /* ignore */
             });
-        })
-        .catch(() => {
-          /* ignore */
         });
     }
     if (phase !== "RESULTS") {
@@ -499,7 +530,7 @@ export default function ResultsPage() {
     } else {
       setLoading(false);
     }
-  }, [isMeEliminated, phase, nickname, params.roomCode, router, players]);
+  }, [isDuelMode, isMeEliminated, phase, nickname, params.roomCode, router, players]);
 
   const eliminated = players.find((p) => p.id === result?.eliminated_player_id);
   const dictatorPlayer = players.find((p) => p.role === "DICTATOR");

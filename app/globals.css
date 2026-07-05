@@ -1,8 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap");
+
 .home-hero {
   /* Pas de fond ici pour éviter de superposer au fond global */
   background: transparent;
 }
-@import url("https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap");
 
 :root {
   color-scheme: dark;

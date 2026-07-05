@@ -173,7 +173,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               textDecoration: "underline",
             }}
           >
-            Passer l'introduction
+            Passer l&apos;introduction
           </button>
         )}
       </div>
@@ -360,6 +360,8 @@ export default function HomePage() {
               </button>
             </div>
 
+            {error && <p style={{ color: "#f87171" }}>{error}</p>}
+
             {mode === "join" && (
               <div style={{ display: "grid", gap: 10, width: "100%" }}>
                 <label style={{ textAlign: "left", display: "grid", gap: 6 }}>
@@ -371,7 +373,6 @@ export default function HomePage() {
                     onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                   />
                 </label>
-                {error && <p style={{ color: "#f87171" }}>{error}</p>}
 
                 <button
                   className="btn btn-compact"

@@ -267,7 +267,7 @@ export default function VotePage() {
     })
       .then(() => setPhase("RESULTS"))
       .catch(() => setResolving(false));
-  }, [accusations, choiceLocked, nickname, params.roomCode, phase, players, resolving, roundId, votes]);
+  }, [accusations, choiceLocked, isAccuseLocked, nickname, params.roomCode, phase, players, resolutionLeader, resolving, roundId, votes]);
 
   return (
     <div style={{ display: "grid", gap: 16 }}>

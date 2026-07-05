@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
 import { assertTransition } from "@/lib/stateMachine";
+import { stripDisabledFeatures } from "@/lib/gameFeatures";
 
 type Settings = {
   hors_theme_count: number;
@@ -95,13 +96,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Minimum 2 joueurs restants requis" }, { status: 400 });
   }
 
-  const effective = normalizeSettings(alivePlayers.length, {
-    hors_theme_count: room?.hors_theme_count ?? 1,
-    has_cameleon: room?.has_cameleon ?? false,
-    has_dictator: room?.has_dictator ?? false,
-    has_fantome: room?.has_fantome ?? false,
-    drawing_timer_seconds: room?.drawing_timer_seconds ?? 60,
-  });
+  const effective = stripDisabledFeatures(
+    normalizeSettings(alivePlayers.length, {
+      hors_theme_count: room?.hors_theme_count ?? 1,
+      has_cameleon: room?.has_cameleon ?? false,
+      has_dictator: room?.has_dictator ?? false,
+      has_fantome: room?.has_fantome ?? false,
+      drawing_timer_seconds: room?.drawing_timer_seconds ?? 60,
+    }),
+  );
 
   const timerSeconds = [30, 45, 60, 90, 120].includes(effective.drawing_timer_seconds ?? 60)
     ? effective.drawing_timer_seconds

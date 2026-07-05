@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
 import { assertTransition } from "@/lib/stateMachine";
+import { GAME_FEATURES } from "@/lib/gameFeatures";
 
 // Résout un tour : compte les votes, gère égalité, marque l'élimination et note si c'était le Caméléon.
 export async function POST(request: Request) {
@@ -38,18 +39,20 @@ export async function POST(request: Request) {
   }
 
   // Récupère les accusations pour détecter un Caméléon identifié même en cas d'égalité de votes.
-  const { data: accusationsRows } = await supabaseAdmin
-    .from("chameleon_accusations")
-    .select("target_player_id")
-    .eq("room_code", roomCode);
-  const accusedIds = Array.from(new Set((accusationsRows || []).map((a) => a.target_player_id)));
   let accusedChameleonId: string | null = null;
-  if (accusedIds.length > 0) {
-    const { data: accusedPlayers } = await supabaseAdmin
-      .from("players")
-      .select("id, role")
-      .in("id", accusedIds);
-    accusedChameleonId = (accusedPlayers || []).find((p) => p.role === "CAMELEON")?.id ?? null;
+  if (GAME_FEATURES.cameleon) {
+    const { data: accusationsRows } = await supabaseAdmin
+      .from("chameleon_accusations")
+      .select("target_player_id")
+      .eq("room_code", roomCode);
+    const accusedIds = Array.from(new Set((accusationsRows || []).map((a) => a.target_player_id)));
+    if (accusedIds.length > 0) {
+      const { data: accusedPlayers } = await supabaseAdmin
+        .from("players")
+        .select("id, role")
+        .in("id", accusedIds);
+      accusedChameleonId = (accusedPlayers || []).find((p) => p.role === "CAMELEON")?.id ?? null;
+    }
   }
 
   // Comptage
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
   const leaders = Array.from(tally.entries()).filter(([, c]) => c === maxCount).map(([id]) => id);
 
   // Si ce round est déjà marqué comme "dictator_survived", on ne retrait pas (idempotence).
-  if (round.dictator_survived === true) {
+  if (GAME_FEATURES.dictator && round.dictator_survived === true) {
     return NextResponse.json({
       dictatorSurvived: true,
       eliminatedId: null,
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
   }
 
   // Si le Caméléon a été accusé correctement, il est éliminé même en cas d'égalité de votes.
-  const forcedAccusedElimination = !!accusedChameleonId;
+  const forcedAccusedElimination = GAME_FEATURES.cameleon && !!accusedChameleonId;
 
   // Égalité → pas d’élimination, sauf si accusation Caméléon correcte
   if (!forcedAccusedElimination && leaders.length !== 1) {
@@ -92,14 +95,14 @@ export async function POST(request: Request) {
     .select("role, dictator_immunity_used, is_eliminated")
     .eq("id", eliminatedId)
     .maybeSingle();
-  const isChameleon = player?.role === "CAMELEON";
-  const isDictator = player?.role === "DICTATOR";
+  const isChameleon = GAME_FEATURES.cameleon && player?.role === "CAMELEON";
+  const isDictator = GAME_FEATURES.dictator && player?.role === "DICTATOR";
   const hadImmunityUsed = player?.dictator_immunity_used === true;
   const roundHasSurvival = round?.dictator_survived === true;
 
   // Cas Dictateur : première majorité -> survit, active double vote pour son prochain vote.
   // On tolère le cas où le flag joueur est à true mais que le round n'a pas enregistré de survie (filet de sécurité).
-  if (isDictator && (!hadImmunityUsed || !roundHasSurvival)) {
+  if (GAME_FEATURES.dictator && isDictator && (!hadImmunityUsed || !roundHasSurvival)) {
     await supabaseAdmin
       .from("rounds")
       .update({
@@ -128,19 +131,22 @@ export async function POST(request: Request) {
   }
 
   // Y a-t-il une accusation ciblant ce joueur ?
-  const { data: accusations } = await supabaseAdmin
-    .from("chameleon_accusations")
-    .select("id")
-    .eq("room_code", roomCode)
-    .eq("target_player_id", eliminatedId)
-    .limit(1);
-  const accused = forcedAccusedElimination || (!!accusations && accusations.length > 0);
+  let accused: boolean = forcedAccusedElimination;
+  if (GAME_FEATURES.cameleon && !accused) {
+    const { data: accusations } = await supabaseAdmin
+      .from("chameleon_accusations")
+      .select("id")
+      .eq("room_code", roomCode)
+      .eq("target_player_id", eliminatedId)
+      .limit(1);
+    accused = !!accusations && accusations.length > 0;
+  }
 
   // Marque l’élimination du joueur
   await supabaseAdmin.from("players").update({ is_eliminated: true }).eq("id", eliminatedId);
 
   // Filet de sécurité : si c'était un Dictateur sans immunité consommée (cas concurrence), on annule l'élimination.
-  if (isDictator && !hadImmunityUsed) {
+  if (GAME_FEATURES.dictator && isDictator && !hadImmunityUsed) {
     await supabaseAdmin
       .from("players")
       .update({ is_eliminated: false, dictator_immunity_used: true, dictator_double_vote_active: true })

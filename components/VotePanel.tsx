@@ -45,23 +45,12 @@ export function VotePanel({
   });
 
   return (
-    <div className="card" style={{ display: "grid", gap: 10, padding: 16 }}>
+    <div className="card vote-panel">
       <h3>Vote secret: éliminer un Hors-Thème</h3>
       {players
         .filter((p) => !p.isEliminated)
         .map((p) => (
-          <label
-            key={p.id}
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              padding: "10px 12px",
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
+          <label key={p.id} className="vote-option">
             <input
               type="radio"
               name="vote"
@@ -71,13 +60,15 @@ export function VotePanel({
               onChange={() => setSelected(p.id)}
               style={getRoundInputStyle(selected === p.id, disableVote)}
             />
-            <span style={{ fontWeight: 600 }}>{p.nickname}</span>
+            <span>{p.nickname}</span>
           </label>
         ))}
       {!hideVoteButton && (
-        <button className="btn btn-compact" disabled={!selected || disableVote} onClick={() => selected && onVote(selected)}>
-        Voter
-      </button>
+        <div className="mobile-sticky-actions">
+          <button className="btn btn-compact" disabled={!selected || disableVote} onClick={() => selected && onVote(selected)}>
+            Voter
+          </button>
+        </div>
       )}
       {showAccusation && (
         <>

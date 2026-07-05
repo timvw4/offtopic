@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
+import { GAME_FEATURES } from "@/lib/gameFeatures";
 
 export async function POST(request: Request) {
   if (!supabaseAdmin) return NextResponse.json({ error: "Service key manquant" }, { status: 500 });
+  if (!GAME_FEATURES.cameleon) {
+    return NextResponse.json({ error: "Accusation Caméléon désactivée" }, { status: 403 });
+  }
   const { roomCode, nickname, targetId } = await request.json();
 
   // Check quota

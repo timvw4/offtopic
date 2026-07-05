@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
+import { GAME_FEATURES } from "@/lib/gameFeatures";
 
 const ASSET_VERSION = "v2";
 const asset = (path: string) => `${path}?v=${ASSET_VERSION}`;
@@ -325,7 +326,7 @@ export default function ResultsPage() {
       .maybeSingle()
       .then(({ data }) => {
         setPhase(data?.current_phase ?? null);
-        setIsDuelMode(!!data?.is_duel_mode);
+        setIsDuelMode(GAME_FEATURES.duelMode && !!data?.is_duel_mode);
       });
 
     // Charge les dessins pour le mode Duel (calcul de similarité)
@@ -494,7 +495,7 @@ export default function ResultsPage() {
       router.replace(`/room/${params.roomCode}/vote?nickname=${encodeURIComponent(nickname)}`);
       return;
     }
-    if (phase === "RESULTS" && !resolvedRef.current && !isDuelMode) {
+    if (phase === "RESULTS" && !resolvedRef.current && !(GAME_FEATURES.duelMode && isDuelMode)) {
       resolvedRef.current = true;
       // Secours uniquement : la résolution normale est déclenchée par le leader sur la page vote.
       supabaseClient
@@ -749,7 +750,7 @@ export default function ResultsPage() {
   }
 
   // ── Affichage Mode Duel ──────────────────────────────────────────────────
-  if (isDuelMode) {
+  if (GAME_FEATURES.duelMode && isDuelMode) {
     // Score de ressemblance affiché avec 2 décimales
     const simDisplay = similarity !== null ? similarity.toFixed(2) : null;
 
@@ -778,7 +779,7 @@ export default function ResultsPage() {
                 : "Vous avez dessiné deux choses complètement différentes ! 🙈";
 
     return (
-      <div style={{ display: "grid", gap: 16 }}>
+      <div className="game-page">
         <h2 style={{ margin: 0 }}>⚔️ Résultat du Duel</h2>
 
         {/* Score de ressemblance */}
@@ -879,7 +880,7 @@ export default function ResultsPage() {
   // ── Fin affichage Mode Duel ──────────────────────────────────────────────
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="game-page">
       <h2>Résultat du tour</h2>
       {loading && <p>Résolution des votes…</p>}
       {computedTieIds.length > 0 && (
@@ -1142,7 +1143,7 @@ export default function ResultsPage() {
       </div>
 
       {computedTieIds.length > 0 && isHost && (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div className="mobile-sticky-actions">
           <button
             className="btn"
             onClick={async () => {
@@ -1175,7 +1176,7 @@ export default function ResultsPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="mobile-sticky-actions" style={{ flexWrap: "wrap", alignItems: "center" }}>
         {/* Bouton lobby uniquement si la partie est terminée et pas d'égalité.
             On utilise gameEndedLocked (jamais remis à false) pour éviter que
             les mises à jour temps réel ne fassent disparaître le bouton. */}

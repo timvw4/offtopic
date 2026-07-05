@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
 import { VotePanel } from "@/components/VotePanel";
+import { GAME_FEATURES, isFantomeRole } from "@/lib/gameFeatures";
 
 type VoteRow = { voter_nickname: string; target_player_id: string; round_id: string };
 type AccuseRow = { accuser_nickname: string; target_player_id: string };
@@ -75,7 +76,7 @@ export default function VotePage() {
         setIsEliminated(!!me?.isEliminated);
         const myRole = me?.role ?? null;
         setSelfRole(myRole);
-        setIsCameleonSelf(myRole === "CAMELEON");
+        setIsCameleonSelf(GAME_FEATURES.cameleon && myRole === "CAMELEON");
       });
 
     supabaseClient
@@ -101,7 +102,7 @@ export default function VotePage() {
       .select("has_cameleon")
       .eq("code", room)
       .maybeSingle()
-      .then(({ data }) => setHasCameleon(!!data?.has_cameleon));
+      .then(({ data }) => setHasCameleon(GAME_FEATURES.cameleon && !!data?.has_cameleon));
 
     supabaseClient
       .from("chameleon_accusations")
@@ -206,11 +207,9 @@ export default function VotePage() {
   // Joueurs affichés dans le panneau de vote (cibles) : uniquement les éligibles au vote actuel
   const eligiblePlayers = tieIds.length > 0 ? players.filter((p) => tieIds.includes(p.id)) : players;
   const voteTargets = eligiblePlayers.filter((p) => p.id !== selfId && !p.isEliminated);
-  // Un joueur est "Fantôme" s'il a le rôle FANTOME ou FANTOME_HT
-  const isFantomeRole = (role: string | null) => role === "FANTOME" || role === "FANTOME_HT";
   const isFantomeSelf = isFantomeRole(selfRole);
   const voteStatusPlayers = players.filter((p) => !p.isEliminated || isFantomeRole(p.role));
-  const canShowAccusation = hasCameleon && !isCameleonSelf;
+  const canShowAccusation = GAME_FEATURES.cameleon && hasCameleon && !isCameleonSelf;
   const accusationEnabled = canShowAccusation && accusationAvailable;
   const hasVoted = useMemo(
     () => votes.some((v) => v.voter_nickname === nickname && (!roundId || v.round_id === roundId)),
@@ -270,7 +269,7 @@ export default function VotePage() {
   }, [accusations, choiceLocked, isAccuseLocked, nickname, params.roomCode, phase, players, resolutionLeader, resolving, roundId, votes]);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="game-page">
       <h2>Vote</h2>
       {tieIds.length > 0 && <p>Égalité précédente : revote uniquement entre les ex æquo.</p>}
       <div className="card" style={{ display: "grid", gap: 10 }}>

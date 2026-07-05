@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
+import { GAME_FEATURES } from "@/lib/gameFeatures";
 import { WordCard } from "@/components/WordCard";
 import { Player } from "@/lib/types";
 
@@ -110,7 +111,7 @@ export default function WordRevealPage() {
         .select("is_duel_mode")
         .eq("code", room)
         .maybeSingle();
-      setIsDuelMode(!!roomData?.is_duel_mode);
+      setIsDuelMode(GAME_FEATURES.duelMode && !!roomData?.is_duel_mode);
 
       const { data: pData } = await supabaseClient.from("players").select("*").eq("room_code", room);
       setPlayers((prev) => mergePlayers(prev, mapPlayers(pData || [])));
@@ -228,13 +229,18 @@ export default function WordRevealPage() {
   }, [drawStartsAt, isEliminated, nickname, params.roomCode, router, timerSeconds]);
 
   // Ne montre pas le mot tant que le round + rôle ne sont pas chargés
-  // HORS_THEME et FANTOME_HT reçoivent le mot hors-thème (le Fantôme-HT ne sait pas qu'il a un mot différent)
-  const displayedWord = dataLoaded ? (role === "HORS_THEME" || role === "FANTOME_HT" ? wordHorsTheme : wordCivil) : "...";
+  const getsHorsThemeWord = role === "HORS_THEME" || (GAME_FEATURES.fantome && role === "FANTOME_HT");
+  const displayedWord = dataLoaded ? (getsHorsThemeWord ? wordHorsTheme : wordCivil) : "...";
 
   // Le Hors-Thème est traité visuellement comme un Civil : il ne sait pas qu'il a un mot différent.
-  // Le FANTOME_HT voit les infos Fantôme (il sait qu'il est Fantôme) mais reçoit le mot HT à son insu.
-  // On utilise displayedRole pour tout ce qui est affiché (label, image, description).
-  const displayedRole = role === "HORS_THEME" ? "CIVIL" : role === "FANTOME_HT" ? "FANTOME" : role;
+  const displayedRole = (() => {
+    if (role === "HORS_THEME") return "CIVIL";
+    if (GAME_FEATURES.fantome && role === "FANTOME_HT") return "FANTOME";
+    if (GAME_FEATURES.cameleon && role === "CAMELEON") return "CAMELEON";
+    if (GAME_FEATURES.dictator && role === "DICTATOR") return "DICTATOR";
+    if (GAME_FEATURES.fantome && role === "FANTOME") return "FANTOME";
+    return "CIVIL";
+  })();
 
   const roleLabel = !dataLoaded
     ? "..."
@@ -253,7 +259,7 @@ export default function WordRevealPage() {
           ? "Tu joue comme un civil mais si une majorité vote contre toi la première fois, tu survis et ton prochain vote comptera double. La seconde fois, tu es éliminé."
         : displayedRole === "FANTOME"
           ? "Tu es un Fantôme : joue comme un civil et dessine le mot normalement. Mais si tu es éliminé, tu pourras continuer à voter depuis l'au-delà !"
-          : isDuelMode
+          : GAME_FEATURES.duelMode && isDuelMode
             ? "Dessine ce mot le plus fidèlement possible ! Vos deux dessins seront comparés et un score de ressemblance vous sera révélé. Qui a le meilleur coup de crayon ?"
             : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème."; // CIVIL et HORS_THEME voient la même description
   const roleMedia =
@@ -277,7 +283,7 @@ export default function WordRevealPage() {
   const roleLabelMarginTop = displayedRole === "CIVIL" ? 0 : -30;
 
   return (
-    <div ref={wordSectionRef} style={{ display: "grid", gap: 16 }}>
+    <div ref={wordSectionRef} className="game-page">
       <div
         className="card"
         style={{ display: "grid", gap: 6, textAlign: "center", alignItems: "center", justifyItems: "center" }}

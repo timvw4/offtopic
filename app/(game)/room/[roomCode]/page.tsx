@@ -6,6 +6,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
 import { PlayerList } from "@/components/PlayerList";
+import { GAME_FEATURES, hasAnySpecialRole, stripDisabledFeatures } from "@/lib/gameFeatures";
 
 // Ajoute un paramètre de version pour forcer le rechargement des nouvelles images.
 const ASSET_VERSION = "v2";
@@ -75,9 +76,9 @@ export default function LobbyPage() {
   const { options } = allowedSettings(playerCount);
   const hasSingleHtOption = options.length === 1;
   const selectedHt = options.includes(settings.hors_theme_count) ? settings.hors_theme_count : options[0];
-  const selectedCam = settings.has_cameleon ?? false;
-  const selectedDict = settings.has_dictator ?? false;
-  const selectedFant = settings.has_fantome ?? false;
+  const selectedCam = GAME_FEATURES.cameleon ? (settings.has_cameleon ?? false) : false;
+  const selectedDict = GAME_FEATURES.dictator ? (settings.has_dictator ?? false) : false;
+  const selectedFant = GAME_FEATURES.fantome ? (settings.has_fantome ?? false) : false;
   const selectedTheme = settings.word_theme || "general";
   const htDisplay = selectedHt === 1 ? "1 Hors-Thème" : `${selectedHt} Hors-Thèmes`;
 
@@ -177,17 +178,19 @@ export default function LobbyPage() {
           await supabaseClient.from("rooms").update({ host_nickname: hostNickname }).eq("code", room);
         }
 
-        setSettings({
-          hors_theme_count: roomRow?.hors_theme_count ?? 1,
-          has_cameleon: roomRow?.has_cameleon ?? false,
-          has_dictator: roomRow?.has_dictator ?? false,
-          has_fantome: roomRow?.has_fantome ?? false,
-          host_nickname: hostNickname,
-          current_phase: roomRow?.current_phase ?? "LOBBY",
-          drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
-          word_theme: roomRow?.word_theme ?? "general",
-          is_duel_mode: roomRow?.is_duel_mode ?? false,
-        });
+        setSettings(
+          stripDisabledFeatures({
+            hors_theme_count: roomRow?.hors_theme_count ?? 1,
+            has_cameleon: roomRow?.has_cameleon ?? false,
+            has_dictator: roomRow?.has_dictator ?? false,
+            has_fantome: roomRow?.has_fantome ?? false,
+            host_nickname: hostNickname,
+            current_phase: roomRow?.current_phase ?? "LOBBY",
+            drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
+            word_theme: roomRow?.word_theme ?? "general",
+            is_duel_mode: roomRow?.is_duel_mode ?? false,
+          }),
+        );
 
         const amHost = hostNickname === nickname;
 
@@ -284,17 +287,19 @@ export default function LobbyPage() {
             "postgres_changes",
             { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${room}` },
             ({ new: n }) => {
-              setSettings((prev) => ({
-                hors_theme_count: n?.hors_theme_count ?? prev.hors_theme_count,
-                has_cameleon: n?.has_cameleon ?? prev.has_cameleon,
-                has_dictator: n?.has_dictator ?? prev.has_dictator,
-                has_fantome: n?.has_fantome ?? prev.has_fantome,
-                host_nickname: n?.host_nickname ?? prev.host_nickname,
-                current_phase: n?.current_phase ?? prev.current_phase,
-                drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
-                word_theme: n?.word_theme ?? prev.word_theme ?? "general",
-                is_duel_mode: n?.is_duel_mode ?? prev.is_duel_mode ?? false,
-              }));
+              setSettings((prev) =>
+                stripDisabledFeatures({
+                  hors_theme_count: n?.hors_theme_count ?? prev.hors_theme_count,
+                  has_cameleon: n?.has_cameleon ?? prev.has_cameleon,
+                  has_dictator: n?.has_dictator ?? prev.has_dictator,
+                  has_fantome: n?.has_fantome ?? prev.has_fantome,
+                  host_nickname: n?.host_nickname ?? prev.host_nickname,
+                  current_phase: n?.current_phase ?? prev.current_phase,
+                  drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
+                  word_theme: n?.word_theme ?? prev.word_theme ?? "general",
+                  is_duel_mode: n?.is_duel_mode ?? prev.is_duel_mode ?? false,
+                }),
+              );
             },
           )
           .subscribe();
@@ -404,7 +409,7 @@ export default function LobbyPage() {
     }
   }
 
-  const isDuelMode = settings.is_duel_mode === true;
+  const isDuelMode = GAME_FEATURES.duelMode && settings.is_duel_mode === true;
   // En mode Duel : exactement 2 joueurs requis. Sinon : entre 3 et 15.
   const startDisabled = isDuelMode
     ? playerCount !== 2
@@ -412,9 +417,9 @@ export default function LobbyPage() {
 
   if (joinError) {
     return (
-      <div style={{ display: "grid", gap: 16 }}>
+      <div className="game-page">
         <h2>Impossible de rejoindre</h2>
-        <p style={{ margin: 0, color: "#f87171" }}>{joinError}</p>
+        <p className="error-text">{joinError}</p>
         <button className="btn" type="button" onClick={() => router.push("/")}>
           Retour à l&apos;accueil
         </button>
@@ -423,12 +428,12 @@ export default function LobbyPage() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="game-page">
       <h2>Lobby</h2>
       <PlayerList players={players} showStatus={false} dimEliminated={false} showLobbyStatus={true} />
 
       {/* ── Toggle Mode Duel (visible pour l'hôte uniquement à 2 joueurs, hors panneau Paramètres) ── */}
-      {isHost && playerCount === 2 && (
+      {GAME_FEATURES.duelMode && isHost && playerCount === 2 && (
         <div
           style={{
             padding: "12px 14px",
@@ -477,7 +482,7 @@ export default function LobbyPage() {
       )}
 
       {/* ── Bouton "Ajoute des rôles" (hors panneau Paramètres, visible hôte + hors duel) ── */}
-      {isHost && !isDuelMode && (
+      {hasAnySpecialRole() && isHost && !isDuelMode && (
         <>
               <button
                 type="button"
@@ -850,7 +855,7 @@ export default function LobbyPage() {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <strong>Rôles activés :</strong>
-                    {selectedCam || selectedDict || selectedFant ? (
+                    {hasAnySpecialRole() && (selectedCam || selectedDict || selectedFant) ? (
                   <div
                     style={{
                       display: "flex",
@@ -891,7 +896,7 @@ export default function LobbyPage() {
       )}
 
       {isHost ? (
-        <>
+        <div className="mobile-sticky-actions">
           {startDisabled && isDuelMode && playerCount !== 2 && (
             <p style={{ margin: 0, color: "rgba(250,204,21,0.85)", fontSize: 13 }}>
               Le mode Duel nécessite exactement 2 joueurs ({playerCount} actuellement).
@@ -902,32 +907,32 @@ export default function LobbyPage() {
               Il faut au moins 3 joueurs pour lancer une partie classique.
             </p>
           )}
-        <button
-          className="btn"
-          disabled={startDisabled}
-          style={{ opacity: startDisabled ? 0.5 : 1 }}
-          onClick={async () => {
-            const resp = await fetch("/api/game/start", {
-              method: "POST",
-              body: JSON.stringify({
-                roomCode: params.roomCode,
-                settings: {
+          <button
+            className="btn"
+            disabled={startDisabled}
+            style={{ opacity: startDisabled ? 0.5 : 1 }}
+            onClick={async () => {
+              const resp = await fetch("/api/game/start", {
+                method: "POST",
+                body: JSON.stringify({
+                  roomCode: params.roomCode,
+                  settings: stripDisabledFeatures({
                     hors_theme_count: isDuelMode ? 1 : selectedHt,
-                    has_cameleon: isDuelMode ? false : selectedCam,
-                    has_dictator: isDuelMode ? false : selectedDict,
-                    has_fantome: isDuelMode ? false : selectedFant,
-                  word_theme: selectedTheme,
-                  drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
-                },
-              }),
-            });
-            if (!resp.ok) return;
-            router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
-          }}
-        >
+                    has_cameleon: selectedCam,
+                    has_dictator: selectedDict,
+                    has_fantome: selectedFant,
+                    word_theme: selectedTheme,
+                    drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
+                  }),
+                }),
+              });
+              if (!resp.ok) return;
+              router.push(`/room/${params.roomCode}/word?nickname=${encodeURIComponent(nickname)}`);
+            }}
+          >
             {isDuelMode ? "⚔️ Démarrer le Duel" : "Démarrer"}
-        </button>
-        </>
+          </button>
+        </div>
       ) : (
         <p>En attente de l&apos;hôte pour lancer la partie.</p>
       )}

@@ -37,9 +37,9 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
       sub: "Les Civils doivent le débusquer. Le Hors-Thème doit survivre.",
     },
     {
-      emoji: "⚔️",
-      title: "Modes de jeu",
-      desc: "Classique (3 à 12 joueurs) : trouvez les imposteurs avant qu'il soit trop tard.\n\nMode Duel (2 joueurs) : même mot, deux dessins — comparez vos scores de ressemblance !",
+      emoji: "🚀",
+      title: "Prêt à jouer ?",
+      desc: "Classique (3 à 15 joueurs) : chacun reçoit un mot secret, dessine, puis vote pour débusquer les Hors-Thème.",
       sub: "Créez une salle, partagez le code et c'est parti !",
     },
   ];
@@ -277,7 +277,7 @@ export default function HomePage() {
       {/* Modal d'onboarding (visible uniquement à la première visite) */}
       {showOnboarding && <OnboardingModal onClose={closeOnboarding} />}
 
-      <div className="home-hero" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div className="home-hero home-page" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         <div
           style={{
             display: "grid",
@@ -288,6 +288,7 @@ export default function HomePage() {
             minHeight: "calc(100vh - 120px)",
             alignContent: "start",
             flex: 1,
+            width: "100%",
           }}
         >
           <div style={{ display: "grid", gap: 10, textAlign: "center", marginTop: 25 }}>
@@ -306,28 +307,15 @@ export default function HomePage() {
           </div>
 
           {/* Tagline sous le logo */}
-          <p
-            style={{
-              margin: "-36px 0 0",
-              color: "rgba(255,255,255,0.55)",
-              fontSize: 14,
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-              opacity: mounted ? 1 : 0,
-              transition: "opacity 0.7s ease 0.2s",
-            }}
-          >
+          <p className="home-tagline" style={{ opacity: mounted ? 1 : 0, transition: "opacity 0.7s ease 0.2s" }}>
             Dessine. Trompe. Survive.
           </p>
         </div>
           <div
-            className="panel"
+            className="panel home-panel"
             style={{
               display: "grid",
               gap: 14,
-              width: "100%",
-              maxWidth: 520,
-              justifySelf: "center",
               marginTop: 12,
               alignSelf: "center",
               opacity: mounted ? 1 : 0,
@@ -335,8 +323,8 @@ export default function HomePage() {
               transition: "opacity 0.65s ease 0.12s, transform 0.65s ease 0.12s",
             }}
           >
-            <label style={{ textAlign: "left", display: "grid", gap: 6 }}>
-              <span style={{ fontWeight: 600 }}>Ton pseudo</span>
+            <label className="form-field">
+              <span>Ton pseudo</span>
               <input
                 className="input"
                 placeholder="Ex: BigbougGius"
@@ -345,7 +333,7 @@ export default function HomePage() {
               />
             </label>
 
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+            <div className="home-actions">
               <button className="btn btn-compact" onClick={handleCreate}>
                 Créer une partie
               </button>
@@ -360,12 +348,12 @@ export default function HomePage() {
               </button>
             </div>
 
-            {error && <p style={{ color: "#f87171" }}>{error}</p>}
+            {error && <p className="error-text">{error}</p>}
 
             {mode === "join" && (
               <div style={{ display: "grid", gap: 10, width: "100%" }}>
-                <label style={{ textAlign: "left", display: "grid", gap: 6 }}>
-                  <span style={{ fontWeight: 600 }}>Code de salle</span>
+                <label className="form-field">
+                  <span>Code de salle</span>
                   <input
                     className="input"
                     placeholder="Ex: ABC23"

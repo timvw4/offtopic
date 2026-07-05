@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
 import { assertTransition } from "@/lib/stateMachine";
+import { GAME_FEATURES, stripDisabledFeatures } from "@/lib/gameFeatures";
 
 type Settings = {
   hors_theme_count: number;
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     .single();
   assertTransition(room?.current_phase || "LOBBY", "WORD");
 
-  const isDuelMode = room?.is_duel_mode === true;
+  const isDuelMode = GAME_FEATURES.duelMode && room?.is_duel_mode === true;
 
   const { data: players } = await supabaseAdmin
     .from("players")
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
     word_theme: typeof settingsOverride?.word_theme === "string" ? settingsOverride.word_theme : baseSettings.word_theme,
   };
 
-  const effective = normalizeSettings(players.length, mergedSettings);
+  const effective = stripDisabledFeatures(normalizeSettings(players.length, mergedSettings));
 
   const timerSeconds = [30, 45, 60, 90, 120].includes(effective.drawing_timer_seconds ?? 60)
     ? effective.drawing_timer_seconds

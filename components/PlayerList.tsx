@@ -20,27 +20,14 @@ export function PlayerList({
   showLobbyStatus = false,
 }: Props) {
   return (
-    <div
-      className="card"
-      style={{
-        display: "grid",
-        gap: 10,
-        border: "1px solid rgba(250, 204, 21, 0.6)" /* contour jaune légèrement transparent */,
-      }}
-    >
+    <div className="card player-list">
       <h3>Joueurs</h3>
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
         {players.map((p) => (
           <li
             key={p.id}
+            className="player-list__item"
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
               opacity: dimEliminated && p.isEliminated ? 0.4 : dimNotInLobby && p.isInLobby === false ? 0.5 : 1,
             }}
           >

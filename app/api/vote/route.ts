@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
+import { GAME_FEATURES } from "@/lib/gameFeatures";
 
 export async function POST(request: Request) {
   if (!supabaseAdmin) return NextResponse.json({ error: "Service key manquant" }, { status: 500 });
@@ -25,7 +26,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Vote sur soi-même interdit" }, { status: 400 });
   }
 
-  const isDictatorWithDouble = voter?.role === "DICTATOR" && voter?.dictator_double_vote_active === true;
+  const isDictatorWithDouble =
+    GAME_FEATURES.dictator && voter?.role === "DICTATOR" && voter?.dictator_double_vote_active === true;
   const weight = isDictatorWithDouble ? 2 : 1;
 
   await supabaseAdmin.from("votes").upsert({

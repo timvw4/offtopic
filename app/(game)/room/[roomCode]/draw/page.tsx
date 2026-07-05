@@ -140,53 +140,15 @@ export default function DrawPage() {
   }, [drawStartsAt, isEliminated, nickname, params.roomCode, router, timer]);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="game-page">
       <h2>Dessine subtilement le mot</h2>
 
       {countdown !== null && countdown > 0 && (
-        <>
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.65)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 50,
-              pointerEvents: "none",
-            }}
-          >
-            <span
-              key={countdown}
-              style={{
-                fontSize: 64,
-                fontWeight: 900,
-                color: "#facc15",
-                textShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                animation: "pop-count 0.8s ease",
-              }}
-            >
-              {countdown}
-            </span>
-          </div>
-          <style jsx>{`
-            @keyframes pop-count {
-              0% {
-                transform: scale(0.5);
-                opacity: 0;
-              }
-              50% {
-                transform: scale(1.1);
-                opacity: 1;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
-            }
-          `}</style>
-        </>
+        <div className="draw-countdown-overlay">
+          <span key={countdown} className="draw-countdown-number">
+            {countdown}
+          </span>
+        </div>
       )}
 
       {!isEliminated && (

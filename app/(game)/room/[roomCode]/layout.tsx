@@ -59,15 +59,12 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="room-shell">
       <style jsx global>{MENU_ANIMATION}</style>
-      <header
-        className="card"
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 3000 }}
-      >
+      <header className="card room-header">
         <div>
           <strong>Salle</strong>{" "}
-          <span style={{ color: "#facc15", fontWeight: 800, letterSpacing: 0.4 }}>{params.roomCode}</span>
+          <span className="room-header__code">{params.roomCode}</span>
         </div>
 
         {/* Petit menu qui regroupe Quitter et un simple bouton On/Off. */}

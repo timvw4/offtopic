@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
+import { GAME_FEATURES } from "@/lib/gameFeatures";
 
 interface DrawingRow {
   id: string;
@@ -78,7 +79,7 @@ export default function RevealPage() {
       .then(({ data }) => {
         setHost(data?.host_nickname || null);
         setPhase(data?.current_phase || null);
-        setIsDuelMode(!!data?.is_duel_mode);
+        setIsDuelMode(GAME_FEATURES.duelMode && !!data?.is_duel_mode);
       });
 
     channel = supabaseClient
@@ -212,7 +213,7 @@ export default function RevealPage() {
   }, []);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="game-page">
       <h2>Révélation des dessins</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div
@@ -239,7 +240,7 @@ export default function RevealPage() {
           {expectedDrawings !== null ? `/${expectedDrawings}` : ""}
         </div>
       </div>
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+      <div className="reveal-grid">
         {drawings
           .filter((d) => d.data_url && d.nickname) // sécurité
           .map((d) => (
@@ -310,11 +311,12 @@ export default function RevealPage() {
         ))}
       </div>
       {isHost ? (
-        <button
-          className="btn btn-compact"
-          disabled={!revealUnlocked}
-          style={{ opacity: revealUnlocked ? 1 : 0.5 }}
-          onClick={async () => {
+        <div className="mobile-sticky-actions">
+          <button
+            className="btn btn-compact"
+            disabled={!revealUnlocked}
+            style={{ opacity: revealUnlocked ? 1 : 0.5 }}
+            onClick={async () => {
             if (isDuelMode) {
               // En mode Duel : passe directement en RESULTS, sans vote ni devinette
               await supabaseClient
@@ -336,6 +338,7 @@ export default function RevealPage() {
         >
           {isDuelMode ? "⚔️ Voir les résultats" : "Passer au vote"}
         </button>
+        </div>
       ) : (
         <p>En attente de l&apos;hôte pour {isDuelMode ? "voir les résultats" : "passer au vote"}…</p>
       )}

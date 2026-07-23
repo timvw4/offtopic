@@ -3,6 +3,7 @@
 import "./globals.css";
 import { ReactNode, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { Analytics } from "@vercel/analytics/next";
 import { AmbientAudioProvider } from "@/components/AmbientAudio";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AmbientAudioProvider showFloatingButton={isHome} placement={isHome ? "top" : "bottom"}>
           <main className="app-shell">{children}</main>
         </AmbientAudioProvider>
+        <Analytics />
       </body>
     </html>
   );

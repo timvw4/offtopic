@@ -127,7 +127,8 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
                 background: "rgba(12,12,14,0.88)",
                 backdropFilter: "blur(10px)",
                 boxShadow: "0 14px 32px rgba(0,0,0,0.45)",
-                minWidth: 180,
+                minWidth: 200,
+                maxWidth: "calc(100vw - 24px)",
                 zIndex: 4000, // au-dessus des sections animées
                 animation: "menuFadeScale 160ms ease-out",
                 transformOrigin: "top right",
@@ -144,7 +145,15 @@ export default function RoomLayout({ children }: { children: ReactNode }) {
                   style={{
                     justifyContent: "flex-start",
                     borderRadius: 10,
+                    border: "none",
                     background: "rgba(255,255,255,0.04)",
+                    color: "#e5e7eb",
+                    width: "100%",
+                    height: "auto",
+                    minHeight: 44,
+                    padding: "10px 14px",
+                    fontSize: 15,
+                    whiteSpace: "nowrap",
                     transition: "background 160ms ease",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}

@@ -2,7 +2,8 @@
 
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-const SOURCE = "/embience.wav"; // veille à ce que le fichier soit présent dans public/
+const SOURCE = "/ambience.mp3";
+const STORAGE_KEY = "off-topic-ambient-audio";
 
 type Placement = "top" | "bottom";
 type Variant = "floating" | "inline";
@@ -15,7 +16,23 @@ type AmbientAudioContextValue = {
 
 const AmbientAudioContext = createContext<AmbientAudioContextValue | null>(null);
 
-// Hook pratique pour récupérer l'état (ON/OFF) et l'action toggle dans n'importe quel composant.
+function readUserWantsMusic(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+function saveUserWantsMusic(on: boolean) {
+  try {
+    localStorage.setItem(STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // localStorage indisponible (mode privé strict, etc.)
+  }
+}
+
 export function useAmbientAudio() {
   const ctx = useContext(AmbientAudioContext);
   if (!ctx) {
@@ -30,7 +47,6 @@ type ProviderProps = {
   showFloatingButton?: boolean;
 };
 
-// Provider : gère le son et expose un état + un toggle accessibles partout via le hook ci-dessus.
 export function AmbientAudioProvider({ children, placement = "bottom", showFloatingButton = false }: ProviderProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState<boolean>(false);
@@ -40,35 +56,66 @@ export function AmbientAudioProvider({ children, placement = "bottom", showFloat
     const audio = new Audio(SOURCE);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.05; // ajuste ici si trop faible ou trop fort (0.0 à 1.0)
+    audio.volume = 0.05;
     audioRef.current = audio;
 
     const tryPlay = async () => {
+      if (!readUserWantsMusic()) {
+        audio.pause();
+        setPlaying(false);
+        return;
+      }
       try {
         setError(null);
         await audio.play();
         setPlaying(true);
-      } catch (err) {
-        // Autoplay bloqué : on affiche le bouton pour déclencher manuellement
+      } catch {
+        audio.pause();
         setPlaying(false);
-        setError("");
+        setError(null);
       }
     };
 
-    // tentative auto au chargement
-    void tryPlay();
+    const onAudioError = () => {
+      audio.pause();
+      setPlaying(false);
+      setError("Impossible de charger la musique.");
+    };
 
-    // tentative dès la première interaction utilisateur (débloque l'autoplay)
-    const onFirstInteract = () => {
+    audio.addEventListener("error", onAudioError);
+
+    if (readUserWantsMusic()) {
       void tryPlay();
-      document.removeEventListener("pointerdown", onFirstInteract);
+    } else {
+      setPlaying(false);
+    }
+
+    // Débloque l'autoplay uniquement si l'utilisateur avait déjà choisi « musique ON ».
+    const onFirstInteract = () => {
+      if (readUserWantsMusic() && audio.paused) {
+        void tryPlay();
+      }
     };
     document.addEventListener("pointerdown", onFirstInteract, { once: true });
 
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY) return;
+      if (event.newValue === "on") {
+        void tryPlay();
+      } else {
+        audio.pause();
+        setPlaying(false);
+        setError(null);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
     return () => {
+      audio.removeEventListener("error", onAudioError);
+      document.removeEventListener("pointerdown", onFirstInteract);
+      window.removeEventListener("storage", onStorage);
       audio.pause();
       audioRef.current = null;
-      document.removeEventListener("pointerdown", onFirstInteract);
     };
   }, []);
 
@@ -77,15 +124,21 @@ export function AmbientAudioProvider({ children, placement = "bottom", showFloat
     if (!audio) return;
     try {
       if (audio.paused) {
+        saveUserWantsMusic(true);
         setError(null);
         await audio.play();
         setPlaying(true);
       } else {
+        saveUserWantsMusic(false);
         audio.pause();
         setPlaying(false);
+        setError(null);
       }
-    } catch (err) {
-      setError("Lecture bloquée.");
+    } catch {
+      saveUserWantsMusic(false);
+      audio.pause();
+      setPlaying(false);
+      setError("Lecture bloquée. Réessayez après un clic sur la page.");
     }
   }, []);
 
@@ -111,21 +164,36 @@ type ButtonProps = {
   variant?: Variant;
 };
 
-// Bouton réutilisable : floating (comme avant) ou inline (parfait dans un menu).
 export function AmbientAudioButton({ placement = "bottom", variant = "floating" }: ButtonProps) {
   const { playing, error, toggle } = useAmbientAudio();
+  const ariaLabel = playing ? "Couper la musique d'ambiance" : "Activer la musique d'ambiance";
 
   if (variant === "inline") {
     return (
       <div style={{ display: "grid", gap: 4 }}>
         <button
+          type="button"
           className="btn btn-compact btn-ghost"
-          style={{ justifyContent: "flex-start" }}
+          aria-label={ariaLabel}
+          aria-pressed={playing}
+          style={{
+            justifyContent: "flex-start",
+            border: "none",
+            borderRadius: 10,
+            background: "transparent",
+            color: "#e5e7eb",
+            width: "100%",
+            height: "auto",
+            minHeight: 44,
+            padding: "10px 14px",
+            fontSize: 15,
+            whiteSpace: "nowrap",
+          }}
           onClick={toggle}
         >
           {playing ? "🔊  Musique : ON" : "🔇  Musique : OFF"}
         </button>
-        {error && <small style={{ margin: 0, color: "#e5e7eb" }}>{error || "Lecture bloquée"}</small>}
+        {error ? <small style={{ margin: 0, color: "#fca5a5" }}>{error}</small> : null}
       </div>
     );
   }
@@ -144,7 +212,10 @@ export function AmbientAudioButton({ placement = "bottom", variant = "floating" 
       }}
     >
       <button
+        type="button"
         className="btn btn-compact btn-ghost"
+        aria-label={ariaLabel}
+        aria-pressed={playing}
         style={{
           color: "#facc15",
           padding: "6px 8px",
@@ -156,9 +227,9 @@ export function AmbientAudioButton({ placement = "bottom", variant = "floating" 
         }}
         onClick={toggle}
       >
-        {playing ? "▶️ ON" : "⏸️ OFF"}
+        {playing ? "⏸️ ON" : "▶️ OFF"}
       </button>
-      {error && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#e5e7eb" }}>{error}</p>}
+      {error ? <p style={{ margin: "6px 0 0", fontSize: 12, color: "#fca5a5" }}>{error}</p> : null}
     </div>
   );
 }

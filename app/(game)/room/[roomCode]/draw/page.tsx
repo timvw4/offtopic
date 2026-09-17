@@ -40,14 +40,10 @@ export default function DrawPage() {
     };
 
     const startPollRound = () => {
-      if (!pollRound) pollRound = setInterval(fetchRound, 2000);
+      if (!pollRound) pollRound = setInterval(fetchRound, 500);
     };
 
-    const stopPollRound = () => {
-      if (pollRound) { clearInterval(pollRound); pollRound = null; }
-    };
-
-    // Poll de secours démarre immédiatement pour couvrir la fenêtre de connexion Realtime
+    // Poll permanent (comme sur la page word) : Realtime « connecté » ne garantit pas les events rounds.
     startPollRound();
 
     async function init() {
@@ -76,13 +72,13 @@ export default function DrawPage() {
           { event: "UPDATE", schema: "public", table: "rounds", filter: `room_code=eq.${room}` },
           ({ new: n }) => setDrawStartsAt(n?.draw_starts_at ?? null),
         )
-        // Pilote le poll de secours selon l'état de la connexion Realtime
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "rounds", filter: `room_code=eq.${room}` },
+          ({ new: n }) => setDrawStartsAt(n?.draw_starts_at ?? null),
+        )
         .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            // ✅ Realtime opérationnel → stoppe le poll (requête inutile)
-            stopPollRound();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            // ❌ Realtime perdu → réactive le poll de secours
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             startPollRound();
           }
         });
@@ -94,6 +90,24 @@ export default function DrawPage() {
       if (pollRound) clearInterval(pollRound);
     };
   }, [nickname, params.roomCode]);
+
+  // Secours : si draw_starts_at manque encore en base, on redemande au serveur de le fixer.
+  useEffect(() => {
+    const room = params.roomCode;
+    if (!room || drawStartsAt) return;
+
+    const requestStart = () => {
+      void fetch("/api/game/draw-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomCode: room }),
+      });
+    };
+
+    requestStart();
+    const id = setInterval(requestStart, 1500);
+    return () => clearInterval(id);
+  }, [drawStartsAt, params.roomCode]);
 
   // Gère le compte à rebours commun
   useEffect(() => {

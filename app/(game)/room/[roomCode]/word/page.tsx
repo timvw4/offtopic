@@ -54,6 +54,18 @@ function mapPlayers(rows: any[]) {
   return (rows || []).map(mapPlayer);
 }
 
+async function tryStartDrawPhase(roomCode: string) {
+  try {
+    await fetch("/api/game/draw-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomCode }),
+    });
+  } catch {
+    // Le poll de secours sur rounds relancera la tentative si besoin.
+  }
+}
+
 export default function WordRevealPage() {
   const router = useRouter();
   const params = useParams<{ roomCode: string }>();
@@ -199,21 +211,15 @@ export default function WordRevealPage() {
 
   const me = players.find((p) => p.nickname === nickname);
 
-  // Quand tous prêts et pas encore de départ, un seul joueur (hôte) déclenche le départ (draw_starts_at)
+  // Quand tous prêts, on demande au serveur de fixer draw_starts_at (idempotent, pas seulement l'hôte).
   useEffect(() => {
-    if (isEliminated) return; // spectateur
+    if (isEliminated) return;
     const room = params.roomCode;
     if (!room || !roundId) return;
     if (!allReady || drawStartsAt) return;
-    if (!me?.isHost) return;
 
-    const start = new Date(Date.now() + 3000).toISOString(); // 3s de pré-compte
-    supabaseClient
-      .from("rounds")
-      .update({ draw_starts_at: start, phase: "DRAW" })
-      .eq("id", roundId)
-      .then();
-  }, [allReady, drawStartsAt, isEliminated, me?.isHost, params.roomCode, roundId]);
+    void tryStartDrawPhase(room);
+  }, [allReady, drawStartsAt, isEliminated, params.roomCode, roundId]);
 
   // Dès qu'un départ est fixé, tout le monde va sur la page dessin (le compte à rebours s'y affichera)
   useEffect(() => {
@@ -250,7 +256,7 @@ export default function WordRevealPage() {
           ? "Dictateur"
         : displayedRole === "FANTOME"
           ? "Fantôme"
-          : "Civil"; // CIVIL et HORS_THEME affichent tous les deux "Civil"
+          : "Rôle inconnu"; // CIVIL et HORS_THEME restent indiscernables
   const roleDescription = !dataLoaded
     ? "Chargement..."
     : displayedRole === "CAMELEON"
@@ -261,7 +267,7 @@ export default function WordRevealPage() {
           ? "Tu es un Fantôme : joue comme un civil et dessine le mot normalement. Mais si tu es éliminé, tu pourras continuer à voter depuis l'au-delà !"
           : GAME_FEATURES.duelMode && isDuelMode
             ? "Dessine ce mot le plus fidèlement possible ! Vos deux dessins seront comparés et un score de ressemblance vous sera révélé. Qui a le meilleur coup de crayon ?"
-            : "Tu es un civil : dessine le mot subtilement pour débusquer les Hors-Thème."; // CIVIL et HORS_THEME voient la même description
+            : "Impossible de savoir si tu es Civil ou Hors-Thème ! Dessine ton mot subtilement et démasque ceux qui n'ont pas le même."; // CIVIL et HORS_THEME voient la même description
   const roleMedia =
     dataLoaded && displayedRole === "CAMELEON"
       ? { src: asset("/roles/chameleon.png"), alt: "Caméléon" }
@@ -270,7 +276,7 @@ export default function WordRevealPage() {
         : dataLoaded && displayedRole === "FANTOME"
           ? { src: asset("/roles/ghost.png"), alt: "Fantôme" }
           : dataLoaded
-            ? { src: asset("/roles/civil.png"), alt: "Civil" } // CIVIL et HORS_THEME voient l'image Civil
+            ? { src: asset("/roles/unknown.png"), alt: "Rôle inconnu" } // CIVIL et HORS_THEME voient la même image
             : null;
   // Images et titres légèrement réduits pour Civil / Hors-Thème (plus lisible sur mobile)
   const roleImageSize = displayedRole === "CIVIL" ? 130 : 170;
@@ -362,6 +368,7 @@ export default function WordRevealPage() {
           // Rafraîchit la liste au cas où l'événement Realtime tarderait
           const { data } = await supabaseClient.from("players").select("*").eq("room_code", params.roomCode);
           setPlayers((prev) => mergePlayers(prev, mapPlayers(data || [])));
+          await tryStartDrawPhase(params.roomCode);
           }}
         >
           Prêt

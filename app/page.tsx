@@ -308,7 +308,7 @@ export default function HomePage() {
 
           {/* Tagline sous le logo */}
           <p className="home-tagline" style={{ opacity: mounted ? 1 : 0, transition: "opacity 0.7s ease 0.2s" }}>
-            Dessine. Trompe. Survive.
+            Dessine. Trompe. Survis.
           </p>
         </div>
           <div

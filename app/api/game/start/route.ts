@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseClient";
 import { assertTransition } from "@/lib/stateMachine";
 import { GAME_FEATURES, stripDisabledFeatures } from "@/lib/gameFeatures";
+import { ALL_THEME_IDS, parseThemes, serializeThemes } from "@/lib/themes";
 
 type Settings = {
   hors_theme_count: number;
@@ -75,6 +76,38 @@ function shuffle<T>(arr: T[]): T[] {
     .map((o) => o.x);
 }
 
+type WordPair = { word_fr_civil: string; word_fr_hors_theme: string };
+
+/**
+ * Tire une paire de mots au hasard parmi les thèmes fournis.
+ *
+ * Chaque paire de tous les thèmes cochés a la même chance de sortir : on compte
+ * d'abord les lignes, puis on cible l'une d'elles par sa position. Charger une
+ * tranche de taille fixe rendrait toutes les paires situées au-delà impossibles à
+ * tirer, ce qui était le cas avant : la limite de 200 gelait plus de la moitié du
+ * contenu du jeu.
+ */
+async function pickRandomPair(themes: string[]): Promise<WordPair | undefined> {
+  if (!supabaseAdmin || themes.length === 0) return undefined;
+
+  const { count } = await supabaseAdmin
+    .from("word_pairs")
+    .select("id", { count: "exact", head: true })
+    .in("theme", themes);
+  if (!count || count <= 0) return undefined;
+
+  const offset = Math.floor(Math.random() * count);
+  // `order` est indispensable : sans tri explicite, Postgres ne garantit pas
+  // l'ordre des lignes et la position tirée ne désignerait rien de stable.
+  const { data } = await supabaseAdmin
+    .from("word_pairs")
+    .select("word_fr_civil, word_fr_hors_theme")
+    .in("theme", themes)
+    .order("id")
+    .range(offset, offset);
+  return (data as WordPair[] | null)?.[0];
+}
+
 export async function POST(request: Request) {
   if (!supabaseAdmin) return NextResponse.json({ error: "Service key manquant" }, { status: 500 });
   const { roomCode, settings: settingsOverride } = await request.json();
@@ -112,7 +145,8 @@ export async function POST(request: Request) {
     has_dictator: room?.has_dictator ?? false,
     has_fantome: room?.has_fantome ?? false,
     drawing_timer_seconds: room?.drawing_timer_seconds ?? 60,
-    word_theme: room?.word_theme ?? "general",
+    // `null` signifie « tous les thèmes », voir parseThemes dans lib/themes.ts.
+    word_theme: room?.word_theme ?? null,
   };
 
   const mergedSettings = {
@@ -169,13 +203,7 @@ export async function POST(request: Request) {
 
     // En mode duel, on utilise toujours le thème "duel" (mots visuels, faits pour être dessinés et comparés)
     const theme = "duel";
-    const { data: themedPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", theme).limit(50);
-    let chosen =
-      themedPairs && themedPairs.length > 0 ? themedPairs[Math.floor(Math.random() * themedPairs.length)] : undefined;
-    if (!chosen) {
-      const { data: fallbackPairs } = await supabaseAdmin.from("word_pairs").select("*").eq("theme", "general").limit(50);
-      chosen = fallbackPairs && fallbackPairs.length > 0 ? fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)] : undefined;
-    }
+    const chosen = (await pickRandomPair([theme])) ?? (await pickRandomPair(ALL_THEME_IDS));
 
     // On stocke le même mot dans word_civil et word_hors_theme pour la compatibilité du schéma
     const duelWord = chosen?.word_fr_civil || "chat";
@@ -200,7 +228,8 @@ export async function POST(request: Request) {
         has_dictator: false,
         has_fantome: false,
         drawing_timer_seconds: timerSeconds,
-        word_theme: theme,
+        // On ne touche pas à `word_theme` : le mode Duel a son propre thème, et
+        // écraser la colonne ferait perdre à l'hôte les thèmes qu'il a cochés.
       })
       .eq("code", roomCode);
 
@@ -286,29 +315,13 @@ export async function POST(request: Request) {
     }
   }
 
-  const theme = mergedSettings.word_theme || "general";
+  // L'hôte peut cocher plusieurs thèmes. `parseThemes` ignore les identifiants
+  // inconnus et retombe sur tous les thèmes si la liste est vide, ce qui évite
+  // qu'un thème renommé ou supprimé laisse la manche sans mot.
+  const selectedThemes = parseThemes(mergedSettings.word_theme);
+  const theme = serializeThemes(selectedThemes);
 
-  // Pick random pair dans le thème.
-  // Si le thème est "general" : on pioche dans TOUS les thèmes (sauf "duel" réservé au mode duel)
-  // pour que le thème général soit vraiment varié.
-  let themedPairsQuery = supabaseAdmin.from("word_pairs").select("*").limit(200);
-  if (theme === "general") {
-    themedPairsQuery = themedPairsQuery.neq("theme", "duel");
-  } else {
-    themedPairsQuery = themedPairsQuery.eq("theme", theme);
-  }
-  const { data: themedPairs } = await themedPairsQuery;
-  let chosen =
-    themedPairs && themedPairs.length > 0 ? themedPairs[Math.floor(Math.random() * themedPairs.length)] : undefined;
-
-  if (!chosen) {
-    // Fallback ultime : on prend n'importe quel mot hors duel
-    const { data: fallbackPairs } = await supabaseAdmin.from("word_pairs").select("*").neq("theme", "duel").limit(50);
-    chosen =
-      fallbackPairs && fallbackPairs.length > 0
-        ? fallbackPairs[Math.floor(Math.random() * fallbackPairs.length)]
-        : undefined;
-  }
+  const chosen = (await pickRandomPair(selectedThemes)) ?? (await pickRandomPair(ALL_THEME_IDS));
 
   // New round
   await supabaseAdmin.from("rounds").insert({

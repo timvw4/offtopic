@@ -1,0 +1,23 @@
+-- Suppression du thème « Situations ».
+--
+-- Ses 50 paires étaient toutes à jeter, pour trois raisons cumulées :
+--
+--   • Le mot était abstrait et indessinable : licenciement, négociation,
+--     apprentissage, pardon, excuse, prudence, mentorat, quarantaine…
+--   • La paire associait un événement à son accessoire au lieu de deux choses
+--     confondables : voyage/billet, déménagement/cartons, livraison/colis,
+--     réservation/hôtel. Le Hors-Thème dessinait donc forcément autre chose et
+--     se faisait démasquer immédiatement.
+--   • Deux paires utilisaient un adjectif comme mot à dessiner
+--     (entretien/annuel), et pot/départ était traduit en anglais par
+--     farewell/sendoff, sans aucun rapport avec « pot ».
+--
+-- Ce thème contenait aussi les 6 derniers mots utilisés deux fois dans le jeu
+-- (agenda, avocat, contrôle, inscription, médecin, réunion). Sa suppression
+-- ramène donc le nombre de doublons à zéro.
+--
+-- Le thème passe de 10 à 9 dans le menu du salon. Il faut aussi le retirer de
+-- la liste écrite en dur dans app/(game)/room/[roomCode]/page.tsx, sinon un
+-- joueur pourrait choisir un thème vide.
+
+delete from public.word_pairs where theme = 'situations';

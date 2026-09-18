@@ -7,6 +7,7 @@ import { supabaseClient } from "@/lib/supabaseClient";
 import { Player } from "@/lib/types";
 import { PlayerList } from "@/components/PlayerList";
 import { GAME_FEATURES, hasAnySpecialRole, stripDisabledFeatures } from "@/lib/gameFeatures";
+import { THEMES, ALL_THEME_IDS, parseThemes, serializeThemes, themesLabel } from "@/lib/themes";
 
 // Ajoute un paramètre de version pour forcer le rechargement des nouvelles images.
 const ASSET_VERSION = "v2";
@@ -59,7 +60,7 @@ export default function LobbyPage() {
     has_dictator: false,
     has_fantome: false,
     drawing_timer_seconds: 60,
-    word_theme: "general",
+    word_theme: null,
     is_duel_mode: false,
   });
   const [showCamTooltip, setShowCamTooltip] = useState(false);
@@ -79,24 +80,30 @@ export default function LobbyPage() {
   const selectedCam = GAME_FEATURES.cameleon ? (settings.has_cameleon ?? false) : false;
   const selectedDict = GAME_FEATURES.dictator ? (settings.has_dictator ?? false) : false;
   const selectedFant = GAME_FEATURES.fantome ? (settings.has_fantome ?? false) : false;
-  const selectedTheme = settings.word_theme || "general";
+  const selectedTheme = settings.word_theme ?? "";
   const htDisplay = selectedHt === 1 ? "1 Hors-Thème" : `${selectedHt} Hors-Thèmes`;
 
-  // Liste des thèmes disponibles (alignée avec les seeds SQL 0017 + 0019)
-  const themes = [
-    { value: "general", label: "Général" },
-    { value: "objets_quotidien", label: "Objets du quotidien" },
-    { value: "situations", label: "Situations" },
-    { value: "nature", label: "Nature" },
-    { value: "technologie", label: "Technologie" },
-    { value: "divertissement", label: "Divertissement" },
-    { value: "sports", label: "Sports" },
-    { value: "fantastique", label: "Fantastique" },
-    { value: "metiers", label: "Métiers" },
-    { value: "pop_culture", label: "Pop-Culture" },
-  ];
+  // Thèmes cochés par l'hôte. La base stocke une liste séparée par des virgules
+  // dans `rooms.word_theme` ; une valeur vide signifie « tous les thèmes ».
+  const selectedThemeIds = parseThemes(selectedTheme);
+  const allThemesSelected = selectedThemeIds.length === ALL_THEME_IDS.length;
+  const themeLabel = themesLabel(selectedThemeIds);
 
-  const themeLabel = themes.find((t) => t.value === selectedTheme)?.label ?? "Général";
+  /**
+   * Coche ou décoche un thème.
+   *
+   * On refuse de décocher le dernier thème restant : sans thème, la partie n'a
+   * aucun mot à tirer.
+   */
+  function toggleTheme(themeId: string) {
+    const next = selectedThemeIds.includes(themeId)
+      ? selectedThemeIds.filter((id) => id !== themeId)
+      : [...selectedThemeIds, themeId];
+    if (next.length === 0) return;
+    // On réordonne selon THEMES pour que l'affichage ne dépende pas de l'ordre des clics.
+    const ordered = ALL_THEME_IDS.filter((id) => next.includes(id));
+    void updateRoomSettings(selectedHt, selectedCam, selectedDict, selectedFant, serializeThemes(ordered));
+  }
   const getRoleCheckboxStyle = (checked: boolean) => ({
     appearance: "none" as const,
     WebkitAppearance: "none" as const,
@@ -169,7 +176,7 @@ export default function LobbyPage() {
               has_dictator: false,
               has_fantome: false,
               current_phase: "LOBBY",
-              word_theme: "general",
+              word_theme: null,
             })
             .select();
         } else if (!hostNickname) {
@@ -187,7 +194,7 @@ export default function LobbyPage() {
             host_nickname: hostNickname,
             current_phase: roomRow?.current_phase ?? "LOBBY",
             drawing_timer_seconds: roomRow?.drawing_timer_seconds ?? 60,
-            word_theme: roomRow?.word_theme ?? "general",
+            word_theme: roomRow?.word_theme ?? null,
             is_duel_mode: roomRow?.is_duel_mode ?? false,
           }),
         );
@@ -296,7 +303,7 @@ export default function LobbyPage() {
                   host_nickname: n?.host_nickname ?? prev.host_nickname,
                   current_phase: n?.current_phase ?? prev.current_phase,
                   drawing_timer_seconds: n?.drawing_timer_seconds ?? prev.drawing_timer_seconds,
-                  word_theme: n?.word_theme ?? prev.word_theme ?? "general",
+                  word_theme: n?.word_theme ?? prev.word_theme ?? null,
                   is_duel_mode: n?.is_duel_mode ?? prev.is_duel_mode ?? false,
                 }),
               );
@@ -360,7 +367,7 @@ export default function LobbyPage() {
     word_theme?: string,
   ) {
     const room = params.roomCode;
-    const nextTheme = word_theme ?? settings.word_theme ?? "general";
+    const nextTheme = word_theme ?? serializeThemes(parseThemes(settings.word_theme));
     const prev = settings;
     setSettings((s) => ({ ...s, hors_theme_count, has_cameleon, has_dictator, has_fantome, word_theme: nextTheme }));
     const { error } = await supabaseClient
@@ -549,7 +556,7 @@ export default function LobbyPage() {
                       type="checkbox"
                       checked={selectedCam}
                       style={getRoleCheckboxStyle(selectedCam)}
-                  onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedFant, selectedTheme)}
+                  onChange={(e) => updateRoomSettings(selectedHt, e.target.checked, selectedDict, selectedFant, serializeThemes(selectedThemeIds))}
                     />
                     <Image src={asset("/roles/chameleon.png")} alt="Caméléon" width={78} height={78} style={{ objectFit: "contain" }} />
                     <div style={{ display: "grid", gap: 4 }}>
@@ -583,7 +590,7 @@ export default function LobbyPage() {
                       type="checkbox"
                       checked={selectedDict}
                       style={getRoleCheckboxStyle(selectedDict)}
-                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedFant, selectedTheme)}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, e.target.checked, selectedFant, serializeThemes(selectedThemeIds))}
                     />
                     <Image src={asset("/roles/dictator.png")} alt="Dictateur" width={80} height={80} style={{ objectFit: "contain" }} />
                     <div style={{ display: "grid", gap: 4 }}>
@@ -617,7 +624,7 @@ export default function LobbyPage() {
                   type="checkbox"
                   checked={selectedFant}
                   style={getRoleCheckboxStyle(selectedFant)}
-                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.checked, selectedTheme)}
+                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, e.target.checked, serializeThemes(selectedThemeIds))}
                 />
                 <Image src={asset("/roles/ghost.png")} alt="Fantôme" width={80} height={80} style={{ objectFit: "contain" }} />
                 <div style={{ display: "grid", gap: 4 }}>
@@ -706,20 +713,86 @@ export default function LobbyPage() {
 
           {showHostParams && (
             <div style={{ display: "grid", gap: 10 }}>
-              <label style={{ display: "grid", gap: 6 }}>
-                Thème des mots
-                <select
-                  className="input"
-                  value={selectedTheme}
-                  onChange={(e) => updateRoomSettings(selectedHt, selectedCam, selectedDict, selectedFant, e.target.value)}
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                  <span>Thèmes des mots</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRoomSettings(
+                        selectedHt,
+                        selectedCam,
+                        selectedDict,
+                        selectedFant,
+                        // Un seul thème coché revient à repartir de zéro : on remet tout.
+                        serializeThemes(allThemesSelected ? [ALL_THEME_IDS[0]] : ALL_THEME_IDS),
+                      )
+                    }
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      color: "#93c5fd",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    {allThemesSelected ? "N'en garder qu'un" : "Tout cocher"}
+                  </button>
+                </div>
+                <small style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: -2 }}>
+                  Les mots sont tirés au hasard parmi les thèmes cochés.
+                </small>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                    gap: 6,
+                    padding: 8,
+                    borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,0.16)",
+                    background: "rgba(255,255,255,0.04)",
+                  }}
                 >
-                  {themes.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  {THEMES.map((t) => {
+                    const checked = selectedThemeIds.includes(t.value);
+                    // Le dernier thème coché n'est pas décochable : il faut au moins un mot à tirer.
+                    const isLastChecked = checked && selectedThemeIds.length === 1;
+                    return (
+                      <label
+                        key={t.value}
+                        title={isLastChecked ? "Garde au moins un thème" : undefined}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "7px 9px",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          lineHeight: 1.2,
+                          fontWeight: checked ? 700 : 500,
+                          color: checked ? "#ffffff" : "rgba(255,255,255,0.62)",
+                          background: checked ? "rgba(147,197,253,0.16)" : "transparent",
+                          border: `1px solid ${checked ? "rgba(147,197,253,0.45)" : "rgba(255,255,255,0.12)"}`,
+                          cursor: isLastChecked ? "not-allowed" : "pointer",
+                          transition: "background 140ms ease, border-color 140ms ease",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={isLastChecked}
+                          onChange={() => toggleTheme(t.value)}
+                          style={{ accentColor: "#60a5fa", cursor: "inherit", flexShrink: 0 }}
+                        />
+                        {t.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
               <label style={{ display: "grid", gap: 6 }}>
                 Hors-Thème
                 {hasSingleHtOption ? (
@@ -739,7 +812,7 @@ export default function LobbyPage() {
                   <select
                     className="input"
                     value={selectedHt}
-                    onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedFant, selectedTheme)}
+                    onChange={(e) => updateRoomSettings(Number(e.target.value), selectedCam, selectedDict, selectedFant, serializeThemes(selectedThemeIds))}
                   >
                     {options.map((opt) => (
                       <option key={opt} value={opt}>
@@ -921,7 +994,7 @@ export default function LobbyPage() {
                     has_cameleon: selectedCam,
                     has_dictator: selectedDict,
                     has_fantome: selectedFant,
-                    word_theme: selectedTheme,
+                    word_theme: serializeThemes(selectedThemeIds),
                     drawing_timer_seconds: settings.drawing_timer_seconds ?? 60,
                   }),
                 }),
